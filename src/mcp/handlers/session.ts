@@ -9,15 +9,8 @@ import {
 } from '../../db/tasks.js'
 import { getActiveWorktrees, pruneStale, upsertWorktreeActivity } from '../../db/worktrees.js'
 import type { WorktreeActivity } from '../../db/worktrees.js'
-
-interface MemoriesPacket {
-  critical: unknown[]
-  relevant: unknown[]
-  antipatterns: unknown[]
-  global: unknown[]
-  total_count: number
-  scopes_available: string[]
-}
+import { buildContextPacket, type ContextPacket } from '../../retrieval/context-packet.js'
+import { detectScopes } from '../../retrieval/scope-detector.js'
 
 interface SessionStartParams {
   worktree?: string
@@ -26,7 +19,7 @@ interface SessionStartParams {
 
 interface SessionStartResult {
   task: (Task & { state?: TaskState }) | null
-  memories: MemoriesPacket
+  memories: ContextPacket
   worktree_conflicts: WorktreeActivity[]
   session_id: string
 }
@@ -48,18 +41,11 @@ interface UpdateTaskResult {
   task_id: string
 }
 
-const EMPTY_MEMORIES: MemoriesPacket = {
-  critical: [],
-  relevant: [],
-  antipatterns: [],
-  global: [],
-  total_count: 0,
-  scopes_available: [],
-}
-
 export async function handleSessionStart(
   db: Database.Database,
   params: SessionStartParams,
+  globalDb?: Database.Database | null,
+  config?: { alwaysIncludeGlobal?: boolean },
 ): Promise<SessionStartResult> {
   const worktree = params.worktree ?? process.cwd()
   const sessionId = uuidv4()
@@ -77,12 +63,20 @@ export async function handleSessionStart(
   const activeWorktrees = getActiveWorktrees(db)
   const worktreeConflicts = activeWorktrees.filter((w) => w.worktree !== worktree)
 
+  // Build context packet with relevant memories
+  const detectedScopes = await detectScopes(worktree)
+  const memories = await buildContextPacket(db, {
+    detectedScopes,
+    includeGlobal: config?.alwaysIncludeGlobal ?? false,
+    globalDb: globalDb ?? undefined,
+  })
+
   if (taskResult) {
     const { task, state } = taskResult
     task.state = state
     return {
       task,
-      memories: EMPTY_MEMORIES,
+      memories,
       worktree_conflicts: worktreeConflicts,
       session_id: sessionId,
     }
@@ -90,7 +84,7 @@ export async function handleSessionStart(
 
   return {
     task: null,
-    memories: EMPTY_MEMORIES,
+    memories,
     worktree_conflicts: worktreeConflicts,
     session_id: sessionId,
   }

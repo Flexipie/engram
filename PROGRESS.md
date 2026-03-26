@@ -1,6 +1,6 @@
 # Engram — Progress Tracker
 
-## Status: Phase 1 Complete ✓
+## Status: Phase 2 Complete ✓
 
 ---
 
@@ -34,30 +34,27 @@
 
 ---
 
-## Phase 2 — Project Memory + Global Memory
+## Phase 2 — Project Memory + Global Memory ✓ DONE
 
 **Goal:** Agent stops making the same mistakes.
 
-### To implement
-- [ ] `memories` table with FTS5 (porter + unicode61 tokenizer) + sync triggers
-- [ ] `global_memories` table in `~/.engram/global.db`
-- [ ] Migration: `0002_memories.sql`, `0003_global.sql`
-- [ ] `remember` MCP tool
-- [ ] `recall` MCP tool (FTS + filter + ranking)
-- [ ] `invalidate` MCP tool
-- [ ] Retrieval ranker (`src/retrieval/ranker.ts`) — `score = confidence × recencyFactor × scopeMatchBoost`
-- [ ] ContextPacket builder (`src/retrieval/context-packet.ts`) — critical/relevant/antipatterns/global buckets, cap 15
-- [ ] `session_start` updated to include ContextPacket
-- [ ] Global DB connection (`src/db/global.ts`)
-- [ ] Global memory query support (`include_global: true`)
-- [ ] Confidence decay on `engram gc` / server start
-- [ ] CLI: `engram memories [--scope] [--type]`, `engram invalidate <id>`
-
-### Tests to write first
-- `src/__tests__/unit/ranker.test.ts`
-- `src/__tests__/unit/context-packet.test.ts`
-- `src/__tests__/integration/memory-handler.test.ts`
-- `src/__tests__/integration/db-decay.test.ts`
+### Completed
+- [x] `memories` table with FTS5 (porter + unicode61 tokenizer) + sync triggers (`0002_memories.sql`)
+- [x] `global_memories` table in `~/.engram/global.db` (`0003_global.sql`)
+- [x] `src/db/memories.ts` — insertMemory, queryMemories, invalidateMemory, getMemoryById, boostConfidence, decreaseConfidence
+- [x] `src/db/global.ts` — openGlobalDb(), insertGlobalMemory(), queryGlobalMemories()
+- [x] `remember` MCP tool
+- [x] `recall` MCP tool (FTS + filter + ranking)
+- [x] `invalidate` MCP tool
+- [x] Retrieval ranker (`src/retrieval/ranker.ts`) — `score = confidence × recencyFactor × scopeMatchBoost`
+- [x] ContextPacket builder (`src/retrieval/context-packet.ts`) — critical/relevant/antipatterns/global buckets, cap 15
+- [x] `session_start` updated to return live ContextPacket
+- [x] Global DB opened lazily based on `alwaysIncludeGlobal` config
+- [x] Global memory query support (`include_global: true`)
+- [x] Confidence decay computed at query time (lazy — no DB mutation)
+- [x] CLI: `engram memories [--scope] [--type] [--json]`, `engram invalidate <id>`
+- [x] Config: `alwaysIncludeGlobal`, `minRecallConfidence` fields added
+- [x] 64 tests passing (unit + integration)
 
 ---
 

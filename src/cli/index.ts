@@ -5,6 +5,8 @@ import { runStart } from './commands/start.js'
 import { runStop } from './commands/stop.js'
 import { runStatus } from './commands/status.js'
 import { runTask } from './commands/task.js'
+import { runMemories } from './commands/memories.js'
+import { runInvalidate } from './commands/invalidate.js'
 
 const program = new Command()
 
@@ -47,6 +49,23 @@ program
   .option('--all', 'Show all active tasks across all worktrees')
   .action(async (options: { all?: boolean }) => {
     await runTask(process.cwd(), options.all ?? false)
+  })
+
+program
+  .command('memories')
+  .description('Browse stored memories in tree view')
+  .option('--scope <scope>', 'Drill into a specific scope')
+  .option('--type <type>', 'Filter by memory type')
+  .option('--json', 'Output raw JSON')
+  .action(async (options: { scope?: string; type?: string; json?: boolean }) => {
+    await runMemories(options)
+  })
+
+program
+  .command('invalidate <id>')
+  .description('Invalidate a memory by ID')
+  .action(async (id: string) => {
+    await runInvalidate(id, {})
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {

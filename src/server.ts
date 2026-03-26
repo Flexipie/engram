@@ -4,6 +4,7 @@ import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
 import { writeFileSync, rmSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { openProjectDb } from './db/connection.js'
+import { openGlobalDb } from './db/global.js'
 import { loadConfig } from './config.js'
 import { logger } from './logger.js'
 import { setupTools } from './mcp/tools.js'
@@ -17,6 +18,7 @@ const port = Number(process.env.ENGRAM_PORT ?? config.port)
 
 // Open DB
 const db = openProjectDb(projectDir)
+const globalDb = config.alwaysIncludeGlobal ? openGlobalDb() : null
 
 // Write PID and running info
 const engramDir = join(projectDir, '.engram')
@@ -48,7 +50,7 @@ const transports = new Map<string, SSEServerTransport>()
 app.get('/mcp', (req, res) => {
   const transport = new SSEServerTransport('/mcp/message', res)
   const server = new McpServer({ name: 'engram', version: '0.1.0' })
-  setupTools(server, db)
+  setupTools(server, db, globalDb)
   void server.connect(transport)
   transports.set(transport.sessionId, transport)
   res.on('close', () => {
@@ -82,6 +84,7 @@ function shutdown(): void {
   logger.info('Shutting down...')
   httpServer.close(() => {
     db.close()
+    if (globalDb) globalDb.close()
     if (existsSync(pidFile)) rmSync(pidFile)
     if (existsSync(runningFile)) rmSync(runningFile)
     logger.info('Shutdown complete')

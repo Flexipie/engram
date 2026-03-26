@@ -15,6 +15,7 @@ function loadMigrationSql(filename: string): string {
 
 const MIGRATIONS: Array<{ version: number; filename: string }> = [
   { version: 1, filename: '0001_init.sql' },
+  { version: 2, filename: '0002_memories.sql' },
 ]
 
 export function applyMigrations(db: Database.Database): void {

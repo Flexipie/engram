@@ -8,6 +8,8 @@ export interface EngramConfig {
   globalMemoryCap: number
   warnThreshold: number
   blockThreshold: number
+  alwaysIncludeGlobal: boolean
+  minRecallConfidence: number
 }
 
 const DEFAULTS: EngramConfig = {
@@ -16,6 +18,8 @@ const DEFAULTS: EngramConfig = {
   globalMemoryCap: 5,
   warnThreshold: 0.6,
   blockThreshold: 0.8,
+  alwaysIncludeGlobal: false,
+  minRecallConfidence: 0.4,
 }
 
 function readJsonFile(filePath: string): Partial<EngramConfig> {
