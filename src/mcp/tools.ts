@@ -3,6 +3,7 @@ import { z } from 'zod'
 import Database from 'better-sqlite3'
 import { handleSessionStart, handleUpdateTask } from './handlers/session.js'
 import { handleRemember, handleRecall, handleInvalidate } from './handlers/memory.js'
+import { handleCheckError, handleRecordError } from './handlers/error.js'
 import { MEMORY_TYPES, MEMORY_SCOPES } from '../db/memories.js'
 import { logger } from '../logger.js'
 
@@ -119,6 +120,44 @@ export function setupTools(
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('recall failed', err)
+        throw err
+      }
+    },
+  )
+
+  server.tool(
+    'check_error',
+    'Look up a known error by signature before diagnosing — returns fix immediately if found',
+    {
+      error_raw: z.string().describe('The full error output'),
+      scope: z.enum(MEMORY_SCOPES).optional().describe('Scope hint (auto-detected if omitted)'),
+    },
+    async (params) => {
+      try {
+        const result = await handleCheckError(db, params)
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      } catch (err) {
+        logger.error('check_error failed', err)
+        throw err
+      }
+    },
+  )
+
+  server.tool(
+    'record_error',
+    'Persist an error pattern with its cause and fix for future lookup',
+    {
+      error_raw: z.string().describe('The full error output'),
+      cause: z.string().optional().describe('What caused the error'),
+      fix: z.string().optional().describe('What resolved it'),
+      scope: z.enum(MEMORY_SCOPES).optional().describe('Scope (auto-detected if omitted)'),
+    },
+    async (params) => {
+      try {
+        const result = await handleRecordError(db, params)
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      } catch (err) {
+        logger.error('record_error failed', err)
         throw err
       }
     },

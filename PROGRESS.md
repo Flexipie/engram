@@ -1,6 +1,6 @@
 # Engram — Progress Tracker
 
-## Status: Phase 2 Complete ✓
+## Status: Phase 3 Complete ✓
 
 ---
 
@@ -58,22 +58,20 @@
 
 ---
 
-## Phase 3 — Error Intelligence
+## Phase 3 — Error Intelligence ✓ DONE
 
 **Goal:** Known errors resolve instantly.
 
-### To implement
-- [ ] `error_patterns` table migration (`0004_errors.sql`)
-- [ ] Error signature normalizer — strip ANSI, paths, line:col, addresses, timestamps, UUIDs → SHA256 → 16-char hex
-- [ ] `check_error` MCP tool
-- [ ] `record_error` MCP tool
-- [ ] `src/db/errors.ts` — lookupErrorSignature, insertErrorPattern, incrementRecurrence
-- [ ] CLI: `engram errors [--scope]`
-- [ ] CLAUDE.md template updated with error workflow
-
-### Tests to write first
-- `src/__tests__/unit/error-normalizer.test.ts`
-- `src/__tests__/integration/error-handler.test.ts`
+### Completed
+- [x] `error_patterns` table migration (`0004_errors.sql`) — signature, raw, normalized, cause, fix, scope, recurrence, last_seen
+- [x] Error signature normalizer (`src/errors/normalizer.ts`) — strip ANSI, absolute paths, line:col, hex addresses, timestamps, UUIDs → SHA256 → 16-char hex
+- [x] `check_error` MCP tool — O(1) signature lookup, increments recurrence on hit
+- [x] `record_error` MCP tool — upsert: insert new or update cause/fix + recurrence
+- [x] `src/db/errors.ts` — lookupBySignature, insertErrorPattern, upsertErrorPattern, incrementRecurrence, listErrorPatterns
+- [x] `src/mcp/handlers/error.ts` — handleCheckError, handleRecordError
+- [x] CLI: `engram errors [--scope] [--json] [--verbose]`
+- [x] CLAUDE.md template updated with check_error/record_error workflow
+- [x] 103 tests passing (39 new: 20 unit normalizer + 19 integration error-handler)
 
 ---
 

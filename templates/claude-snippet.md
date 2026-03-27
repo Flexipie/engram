@@ -21,6 +21,12 @@ You have access to an Engram MCP server at http://localhost:7337/mcp that provid
 - When a memory is outdated or wrong, call `invalidate({ id: "...", reason: "..." })`
 - When about to modify a file another worktree may be touching, check `worktree_conflicts` from `session_start`
 
+**When you encounter an error:**
+1. Call `check_error({ error_raw: "<full error text>" })` — if `found: true`, use the returned `fix` immediately, skip diagnosis
+2. After resolving any error (new or known), call `record_error({ error_raw: "...", cause: "...", fix: "..." })` to persist it
+- `check_error` auto-detects scope from path fragments; pass `scope` to override
+- Same error across different machines/paths → same signature (paths/line numbers stripped)
+
 **Memory types:** `convention` | `decision` | `anti_pattern` | `snippet` | `error_pattern`
 **Memory scopes:** `auth` | `api` | `components` | `database` | `testing` | `config` | `general` | `build` | `types` | `utils` | `services` | `state` | `routing` | `infra` | `scripts`
 

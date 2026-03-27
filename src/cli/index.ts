@@ -7,6 +7,7 @@ import { runStatus } from './commands/status.js'
 import { runTask } from './commands/task.js'
 import { runMemories } from './commands/memories.js'
 import { runInvalidate } from './commands/invalidate.js'
+import { runErrors } from './commands/errors.js'
 
 const program = new Command()
 
@@ -66,6 +67,16 @@ program
   .description('Invalidate a memory by ID')
   .action(async (id: string) => {
     await runInvalidate(id, {})
+  })
+
+program
+  .command('errors')
+  .description('Browse stored error patterns')
+  .option('--scope <scope>', 'Filter by scope')
+  .option('--json', 'Output raw JSON')
+  .option('--verbose', 'Show normalized form and cause fields')
+  .action(async (options: { scope?: string; json?: boolean; verbose?: boolean }) => {
+    await runErrors(options)
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {
