@@ -21,7 +21,6 @@ export function createTestGlobalDb(): Database.Database {
   db.pragma('foreign_keys = ON')
   db.pragma('busy_timeout = 5000')
 
-  // Bootstrap _schema_version
   db.exec(`
     CREATE TABLE IF NOT EXISTS _schema_version (
       version INTEGER PRIMARY KEY,
@@ -33,7 +32,6 @@ export function createTestGlobalDb(): Database.Database {
   if (!existing) {
     const sqlPath = join(__dirname, '../db/migrations/0003_global.sql')
     let sql = readFileSync(sqlPath, 'utf-8')
-    // Remove standalone _schema_version CREATE TABLE — already created above
     sql = sql.replace(/CREATE TABLE IF NOT EXISTS _schema_version[\s\S]*?;/, '')
     const apply = db.transaction(() => {
       db.exec(sql)

@@ -53,7 +53,7 @@ export async function runStart(projectDir: string = process.cwd()): Promise<void
   const port = Number(process.env.ENGRAM_PORT ?? config.port)
 
   // Find the server entry point
-  const serverScript = join(__dirname, '../../../server.js')
+  const serverScript = join(__dirname, '../server.js')
   if (!existsSync(serverScript)) {
     console.error(chalk.red('Error: dist/server.js not found. Run `npm run build` first.'))
     process.exit(1)

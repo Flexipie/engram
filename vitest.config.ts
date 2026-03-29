@@ -1,6 +1,18 @@
-import { defineConfig } from 'vitest/config'
+import { defineConfig, type Plugin } from 'vitest/config'
+
+function sqlPlugin(): Plugin {
+  return {
+    name: 'sql-loader',
+    transform(code, id) {
+      if (id.endsWith('.sql')) {
+        return { code: `export default ${JSON.stringify(code)}` }
+      }
+    },
+  }
+}
 
 export default defineConfig({
+  plugins: [sqlPlugin()],
   test: {
     globals: true,
     environment: 'node',

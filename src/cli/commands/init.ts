@@ -78,7 +78,7 @@ function mergeSettingsJson(projectDir: string): void {
   const claudeDir = join(projectDir, '.claude')
   const settingsPath = join(claudeDir, 'settings.json')
 
-  mkdirSync(claudeDir, { recursive: true })
+  if (!existsSync(claudeDir)) mkdirSync(claudeDir, { recursive: true })
 
   let settings: Record<string, unknown> = {}
   if (existsSync(settingsPath)) {
