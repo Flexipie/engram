@@ -1,6 +1,6 @@
 import express from 'express'
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
-import { SSEServerTransport } from '@modelcontextprotocol/sdk/server/sse.js'
+import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { writeFileSync, rmSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { openProjectDb } from './db/connection.js'
@@ -44,28 +44,13 @@ app.post('/heartbeat', createHeartbeatHandler(db))
 // Snapshot endpoint
 app.post('/snapshot', createSnapshotHandler(db))
 
-// MCP SSE transport — map of sessionId → transport
-const transports = new Map<string, SSEServerTransport>()
-
-app.get('/mcp', (req, res) => {
-  const transport = new SSEServerTransport('/mcp/message', res)
+// MCP streamable HTTP transport
+app.post('/mcp', async (req, res) => {
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
   const server = new McpServer({ name: 'engram', version: '0.1.0' })
   setupTools(server, db, globalDb)
-  void server.connect(transport)
-  transports.set(transport.sessionId, transport)
-  res.on('close', () => {
-    transports.delete(transport.sessionId)
-  })
-})
-
-app.post('/mcp/message', async (req, res) => {
-  const sessionId = req.query['sessionId'] as string
-  const transport = transports.get(sessionId)
-  if (!transport) {
-    res.status(404).json({ error: 'Session not found' })
-    return
-  }
-  await transport.handlePostMessage(req, res)
+  await server.connect(transport)
+  await transport.handleRequest(req, res, req.body)
 })
 
 // Start server
