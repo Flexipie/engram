@@ -2,7 +2,7 @@ import { join } from 'path'
 import chalk from 'chalk'
 import { openProjectDb } from '../../db/connection.js'
 import { getActiveTask } from '../../db/tasks.js'
-import { getActiveWorktrees } from '../../db/worktrees.js'
+import { getActiveWorktrees, pruneStale } from '../../db/worktrees.js'
 
 export async function runTask(
   projectDir: string = process.cwd(),
@@ -12,6 +12,7 @@ export async function runTask(
 
   try {
     if (showAll) {
+      pruneStale(db)
       const worktrees = getActiveWorktrees(db)
       if (worktrees.length === 0) {
         console.log(chalk.yellow('No active worktrees.'))

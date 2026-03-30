@@ -87,6 +87,33 @@ The DB layer (`src/db/`) is isolated from all business logic. Every DB function 
 
 ---
 
+## Known Design Tensions
+
+### Tool naming: `update_task`
+`update_task` both creates AND updates tasks (create-on-missing). Agents starting fresh may not reach for it. Alternatives considered: `sync_task`. Decision deferred — the tool description must explicitly state create-on-missing behaviour.
+
+### Dual enforcement paths
+Convention enforcement has two surfaces: `POST /enforce` (called by `enforce.sh` hook, pre-write interception) and `check_conventions` MCP tool (called directly by the agent mid-session). These serve different purposes. The hook is automatic and passive; the MCP tool is proactive and explicit. Both are necessary. CLAUDE.md must explain when to use each.
+
+### `check_error` + `record_error` as two tools
+Two-phase design is deliberate: look up first (cheap, returns immediately if known), record after resolving (enriches the DB). A merged `error()` tool would be simpler for agents but loses the ability to short-circuit on lookup. Keep two tools, ensure CLAUDE.md makes the workflow sequential and prominent.
+
+### Global vs project memories
+The line between `global: true` (cross-project, `~/.engram/global.db`) and project-local is blurry. Agents won't know which to use. Current state: agent decides via `global` parameter on `remember()`. Future: auto-promotion based on recurrence across projects (Phase 6+). Until then, document that `global: true` is for personal/team conventions that apply across ALL projects, not project-specific rules.
+
+---
+
+## Observability Gap
+
+No per-tool call telemetry exists beyond enforcement stats. Can't measure: how often `session_start` returns a meaningful task vs empty, `check_error` hit rate, which scopes are most used, recall query patterns. Extend the `EnforcementStats` pattern to all tools in Phase 7.
+
+---
+
+## Planned: `engram update-claude-md`
+CLAUDE.md injection is idempotent on init but doesn't update existing projects when the template changes. Need a CLI command that re-injects the latest template into existing projects, respecting the sentinel markers.
+
+---
+
 ## Boundaries: What Stays General
 
 When adding any feature, ask: **does this only work for software/coding agents, or does it work for any agent in any domain?**
@@ -115,7 +142,8 @@ When adding any feature, ask: **does this only work for software/coding agents, 
 | Project memory (FTS5, ranked retrieval) | 2 | ✓ Live |
 | Global memory (cross-project) | 2 | ✓ Live |
 | Error intelligence (signatures, upsert) | 3 | ✓ Live |
-| Convention enforcement | 5 | Planned |
+| Convention enforcement (check_conventions, POST /enforce) | 5 | ✓ Live |
+| Cross-worktree awareness | 4 | In Progress |
 | Dynamic scopes / domain profiles | — | Planned |
 | Full REST API | — | Planned |
 | PostgreSQL backend | — | Future |

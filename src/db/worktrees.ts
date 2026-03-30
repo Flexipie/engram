@@ -74,3 +74,14 @@ export function pruneStale(db: Database.Database, maxAgeMs = 10 * 60 * 1000): vo
   const cutoff = new Date(Date.now() - maxAgeMs).toISOString()
   db.prepare(`DELETE FROM worktree_activity WHERE last_heartbeat < ?`).run(cutoff)
 }
+
+export function getFileConflicts(
+  db: Database.Database,
+  currentWorktree: string,
+  currentKeyFiles: string[],
+): string[] {
+  if (currentKeyFiles.length === 0) return []
+  const others = getActiveWorktrees(db).filter(w => w.worktree !== currentWorktree)
+  const otherActiveFiles = new Set(others.flatMap(w => w.active_files))
+  return [...new Set(currentKeyFiles.filter(f => otherActiveFiles.has(f)))]
+}

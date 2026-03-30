@@ -5,7 +5,7 @@ Universal convention memory layer for agentic AI. Any agent, any domain, any tea
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility strategy.
 
-## Status: Phase 5 Complete ✓
+## Status: Phase 4 + 5 Complete ✓
 
 ---
 
@@ -84,15 +84,33 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility s
 
 **Goal:** Parallel agents are not invisible to each other.
 
-### To implement
-- [ ] `get_worktree_status` MCP tool
-- [ ] Heartbeat pruning (>10 min stale → inactive)
-- [ ] Active resource conflict detection surfaced in `session_start` response
-- [ ] CLI: `engram task --all`
+### Already done (infrastructure from Phase 1)
+- [x] `worktree_activity` table — `worktree`, `task_id`, `active_files`, `last_heartbeat`
+- [x] `pruneStale()` — deletes rows with `last_heartbeat` older than 10 min, called on every `session_start`
+- [x] `session_start` returns `worktree_conflicts` (all other active worktrees)
+- [x] `heartbeat.sh` — fires every 10 tool calls, sends `active_files`
+- [x] `engram task --all` — shows all active worktrees with last heartbeat age
 
-### Tests to write first
-- `src/__tests__/integration/worktree-handler.test.ts`
-- `src/__tests__/integration/http-heartbeat.test.ts`
+### To implement
+- [ ] `get_worktree_status` MCP tool — mid-session check without re-running `session_start`
+  - Returns: `{ active_worktrees: [{ worktree, task_title, task_goal, active_files, age_seconds }], file_conflicts: string[] }`
+  - `file_conflicts`: current worktree's task `key_files` ∩ other worktrees' `active_files` (Option A)
+- [ ] Add `file_conflicts: string[]` to `session_start` response — compare task `key_files` vs other worktrees' `active_files`
+- [ ] `pruneStale()` called before `getActiveWorktrees()` in `engram task --all`
+- [ ] `engram status` shows active worktrees count + enforcement stats (checks/violations since start)
+
+### File conflict detection: Option A (confirmed)
+Compare current worktree's **task `key_files`** (from previous session, persistent) against other worktrees' **`active_files`** (from heartbeat, live).
+Rationale: works at session start before the agent has sent any heartbeats.
+
+### Completed
+- [x] `get_worktree_status` MCP tool — `src/mcp/handlers/worktree.ts`
+- [x] `file_conflicts: string[]` added to `session_start` response
+- [x] `src/db/worktrees.ts` — `getFileConflicts()` helper
+- [x] `engram task --all` — prunes stale before listing
+- [x] `engram status` — shows active worktrees count + enforcement stats (checks/violations/warnings)
+- [x] `/health` endpoint enriched — `active_worktrees`, `enforcement` stats
+- [x] 157 tests passing (25 new: 14 worktree-handler + 11 http-heartbeat)
 
 ---
 
@@ -168,6 +186,18 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility s
 - `src/__tests__/unit/bootstrap-extractor.test.ts`
 - `src/__tests__/integration/gc.test.ts`
 - `src/__tests__/integration/export.test.ts`
+
+---
+
+## Backlog — Feedback-Sourced Improvements
+
+Items identified from design review, not phase-assigned yet:
+
+- [ ] **Per-tool telemetry** — extend `EnforcementStats` pattern to all MCP tools. Track: session_start hit/miss rate on task, check_error hit rate, recall query patterns, remember call volume by type/scope. Expose via `/health` or new `/stats` endpoint.
+- [ ] **`engram update-claude-md`** — re-inject latest CLAUDE.md template into existing projects using sentinel markers. Needed so improvements to the template reach projects that ran `engram init` earlier.
+- [ ] **Global memory decision rule** — auto-promote a memory to global after it appears in N≥3 distinct projects with confidence≥0.7. Today agents must decide manually via `global: true`.
+- [ ] **`update_task` tool description** — explicitly document create-on-missing behaviour so agents starting fresh know to call it. Consider alias `sync_task`.
+- [ ] **CLAUDE.md template length** — current template is concise post-Phase-5. Monitor if agents are following the error workflow (check_error first) in practice. Tighten further if not.
 
 ---
 

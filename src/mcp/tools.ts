@@ -5,6 +5,7 @@ import { handleSessionStart, handleUpdateTask } from './handlers/session.js'
 import { handleRemember, handleRecall, handleInvalidate } from './handlers/memory.js'
 import { handleCheckError, handleRecordError } from './handlers/error.js'
 import { handleCheckConventions } from './handlers/enforce.js'
+import { handleGetWorktreeStatus } from './handlers/worktree.js'
 import { MEMORY_TYPES, MEMORY_SCOPES } from '../db/memories.js'
 import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
@@ -180,6 +181,23 @@ export function setupTools(
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('invalidate failed', err)
+        throw err
+      }
+    },
+  )
+
+  server.tool(
+    'get_worktree_status',
+    'Get all active worktrees and detect file conflicts — use mid-session to check if other agents are touching files you plan to edit',
+    {
+      worktree: z.string().optional().describe('Absolute path to current worktree (defaults to cwd)'),
+    },
+    async (params) => {
+      try {
+        const result = await handleGetWorktreeStatus(db, params)
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      } catch (err) {
+        logger.error('get_worktree_status failed', err)
         throw err
       }
     },

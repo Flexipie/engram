@@ -7,7 +7,7 @@ import {
   type Task,
   type TaskState,
 } from '../../db/tasks.js'
-import { getActiveWorktrees, pruneStale, upsertWorktreeActivity } from '../../db/worktrees.js'
+import { getActiveWorktrees, getFileConflicts, pruneStale, upsertWorktreeActivity } from '../../db/worktrees.js'
 import type { WorktreeActivity } from '../../db/worktrees.js'
 import { buildContextPacket, type ContextPacket } from '../../retrieval/context-packet.js'
 import { detectScopes } from '../../retrieval/scope-detector.js'
@@ -21,6 +21,7 @@ interface SessionStartResult {
   task: (Task & { state?: TaskState }) | null
   memories: ContextPacket
   worktree_conflicts: WorktreeActivity[]
+  file_conflicts: string[]
   session_id: string
 }
 
@@ -71,6 +72,9 @@ export async function handleSessionStart(
     globalDb: globalDb ?? undefined,
   })
 
+  const currentKeyFiles = taskResult?.state?.key_files ?? []
+  const fileConflicts = getFileConflicts(db, worktree, currentKeyFiles)
+
   if (taskResult) {
     const { task, state } = taskResult
     task.state = state
@@ -78,6 +82,7 @@ export async function handleSessionStart(
       task,
       memories,
       worktree_conflicts: worktreeConflicts,
+      file_conflicts: fileConflicts,
       session_id: sessionId,
     }
   }
@@ -86,6 +91,7 @@ export async function handleSessionStart(
     task: null,
     memories,
     worktree_conflicts: worktreeConflicts,
+    file_conflicts: fileConflicts,
     session_id: sessionId,
   }
 }

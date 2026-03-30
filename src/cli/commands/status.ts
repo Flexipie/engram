@@ -55,13 +55,27 @@ export async function runStatus(projectDir: string = process.cwd()): Promise<voi
   console.log(`  Uptime: ${chalk.cyan(uptimeStr)}`)
   console.log(`  MCP:    ${chalk.cyan(`http://localhost:${port}/mcp`)}`)
 
-  // Try to get active tasks count from health endpoint
+  // Try to get live stats from health endpoint
   try {
     const resp = await fetch(`http://localhost:${port}/health`)
     if (resp.ok) {
-      const health = (await resp.json()) as { status: string; version: string }
-      console.log(`  Status: ${chalk.green(health.status)}`)
-      console.log(`  Version: ${chalk.gray(health.version)}`)
+      const health = (await resp.json()) as {
+        status: string
+        version: string
+        active_worktrees: number
+        enforcement?: { checks: number; violations: number; warnings: number }
+      }
+      console.log(`  Status:    ${chalk.green(health.status)}`)
+      console.log(`  Version:   ${chalk.gray(health.version)}`)
+      console.log(`  Worktrees: ${chalk.cyan(String(health.active_worktrees))} active`)
+      if (health.enforcement) {
+        const { checks, violations, warnings } = health.enforcement
+        console.log(
+          `  Enforce:   ${chalk.cyan(String(checks))} checks, ` +
+          `${violations > 0 ? chalk.red(String(violations)) : chalk.gray('0')} violations, ` +
+          `${warnings > 0 ? chalk.yellow(String(warnings)) : chalk.gray('0')} warnings`,
+        )
+      }
     }
   } catch {
     // Server may be starting

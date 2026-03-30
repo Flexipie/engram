@@ -8,7 +8,7 @@ import { openGlobalDb } from './db/global.js'
 import { loadConfig } from './config.js'
 import { logger } from './logger.js'
 import { setupTools } from './mcp/tools.js'
-import { healthHandler } from './http/health.js'
+import { createHealthHandler } from './http/health.js'
 import { createHeartbeatHandler } from './http/heartbeat.js'
 import { createSnapshotHandler } from './http/snapshot.js'
 import { createEnforceHandler, type EnforcementStats } from './http/enforce.js'
@@ -40,7 +40,7 @@ const app = express()
 app.use(express.json())
 
 // Health endpoint
-app.get('/health', healthHandler)
+app.get('/health', createHealthHandler(db, enforcementStats))
 
 // Heartbeat endpoint
 app.post('/heartbeat', createHeartbeatHandler(db))
