@@ -5,7 +5,7 @@ import chalk from 'chalk'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
-const HOOKS_SOURCE_DIR = join(__dirname, '../../../hooks')
+const HOOKS_SOURCE_DIR = join(__dirname, '../../hooks')
 
 const DEFAULT_CONFIG = {
   port: 7337,
@@ -19,7 +19,7 @@ const SENTINEL_START = '<!-- engram:start -->'
 const SENTINEL_END = '<!-- engram:end -->'
 
 function getSnippet(): string {
-  const templatePath = join(__dirname, '../../../templates/claude-snippet.md')
+  const templatePath = join(__dirname, '../../templates/claude-snippet.md')
   if (existsSync(templatePath)) {
     return readFileSync(templatePath, 'utf-8')
   }

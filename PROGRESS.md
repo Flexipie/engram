@@ -1,5 +1,10 @@
 # Engram — Progress Tracker
 
+## Mission
+Universal convention memory layer for agentic AI. Any agent, any domain, any team — every session builds on the last.
+
+See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility strategy.
+
 ## Status: Phase 3 Complete ✓
 
 ---
@@ -82,7 +87,7 @@
 ### To implement
 - [ ] `get_worktree_status` MCP tool
 - [ ] Heartbeat pruning (>10 min stale → inactive)
-- [ ] Active file conflict detection surfaced in `session_start` response
+- [ ] Active resource conflict detection surfaced in `session_start` response
 - [ ] CLI: `engram task --all`
 
 ### Tests to write first
@@ -93,13 +98,14 @@
 
 ## Phase 5 — Convention Enforcement
 
-**Goal:** Violations caught before they are written.
+**Goal:** Violations caught before they are written. Agent-agnostic — works for any domain, not just code.
 
 ### To implement
-- [ ] `/enforce` HTTP endpoint (`src/http/enforce.ts`)
-- [ ] Convention checker (`src/enforcement/checker.ts`) — reads memories ≥ 0.6 confidence for scope
-- [ ] Warn threshold 0.6 → exit 0 with message; Block threshold 0.8 → exit 2
-- [ ] `enforce.sh` hook properly reads stdin JSON, extracts `tool_input.file_path`
+- [ ] `/enforce` HTTP endpoint (`src/http/enforce.ts`) — callable by any agent or hook
+- [ ] Convention checker (`src/enforcement/checker.ts`) — reads memories ≥ 0.6 confidence for scope, domain-agnostic
+- [ ] Warn threshold 0.6 → warning response; Block threshold 0.8 → block response
+- [ ] Claude Code hook integration (`enforce.sh`) as one adapter, not the only one
+- [ ] `enforced` MCP tool — so any agent can call enforcement directly without HTTP
 - [ ] `engram status` shows enforcement activity
 
 ### Tests to write first
@@ -108,19 +114,71 @@
 
 ---
 
-## Phase 6 — Bootstrap + Polish
+## Phase 6 — Dynamic Scopes + Domain Profiles
 
-**Goal:** Day-one value, npm publishable.
+**Goal:** Break out of hardcoded software scopes. Any domain can configure Engram for its context.
 
 ### To implement
-- [ ] `engram bootstrap` — ts-morph AST analysis (import patterns, Zod usage, exports, function signatures) → seed memories at confidence 0.5
-- [ ] `corrections` table + `simple-git` post-commit hook for diff capture
-- [ ] `engram gc` — archive low-confidence memories, prune old snapshots (keep last 3), prune 6-month corrections, archive 60-day-paused tasks
-- [ ] `engram export` — full JSON backup
+- [ ] Domain profile schema — config object: `{ scopes, scopeAdapter, defaultMemoryTypes }`
+- [ ] Make `MEMORY_SCOPES` dynamic — loaded from domain profile, not hardcoded in source
+- [ ] Scope adapter interface — pluggable `(context) => scope` function
+- [ ] Built-in profiles: `software` (current default), `legal`, `research`
+- [ ] `engram init --domain <profile>` — init with a specific domain profile
+- [ ] Config schema updated: `domain` field
+
+### Tests to write first
+- `src/__tests__/unit/domain-profiles.test.ts`
+- `src/__tests__/integration/dynamic-scopes.test.ts`
+
+---
+
+## Phase 7 — Full REST API
+
+**Goal:** Any agent that can make HTTP requests can use Engram, without MCP support.
+
+### To implement
+- [ ] `POST /api/memories` — insert memory
+- [ ] `GET /api/memories` — query memories (scope, type, query params)
+- [ ] `POST /api/sessions/start` — session_start equivalent
+- [ ] `PATCH /api/sessions/:id` — update_task equivalent
+- [ ] `POST /api/errors/check` — check_error equivalent
+- [ ] `POST /api/errors/record` — record_error equivalent
+- [ ] API key auth (simple, single-tenant for local; multi-tenant for cloud)
+- [ ] OpenAPI spec generated from routes
+
+### Tests to write first
+- `src/__tests__/integration/rest-api.test.ts`
+
+---
+
+## Phase 8 — Bootstrap + Polish
+
+**Goal:** Day-one value for new projects, npm publishable.
+
+### To implement
+- [ ] `engram bootstrap` — analyse project and seed memories from existing patterns
+  - Software: ts-morph AST (imports, exports, Zod usage)
+  - General: configurable via domain profile bootstrap adapter
+- [ ] `engram gc` — prune stale data (low-confidence memories, old snapshots, paused tasks)
+- [ ] `engram export` — full JSON backup (portable across instances)
 - [ ] `engram snapshots --restore <id>` — manual restore
-- [ ] npm publish prep (README, bin entry, `files` field)
+- [ ] npm publish prep (README, `files` field, bin entry)
 
 ### Tests to write first
 - `src/__tests__/unit/bootstrap-extractor.test.ts`
 - `src/__tests__/integration/gc.test.ts`
 - `src/__tests__/integration/export.test.ts`
+
+---
+
+## Future — Cloud + SDK
+
+**Goal:** Engram as infrastructure, not just a local tool.
+
+- [ ] PostgreSQL storage backend (same interface as SQLite layer)
+- [ ] Cloud sync — local DB mirrors to hosted store, follows user across machines
+- [ ] Team sharing — multiple agents on same repo feed the same knowledge base
+- [ ] TypeScript SDK — `import { EngramClient } from 'engram'` for embedding in agent frameworks
+- [ ] Python SDK
+- [ ] Web dashboard — browse/manage memories, view enforcement analytics
+- [ ] Multi-tenant auth for hosted deployments
