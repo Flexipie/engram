@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express'
-import Database from 'better-sqlite3'
 import { getActiveTask, createSnapshot } from '../db/tasks.js'
 import { logger } from '../logger.js'
+import { DbPool } from '../db/pool.js'
 
-export function createSnapshotHandler(db: Database.Database) {
+export function createSnapshotHandler(pool: DbPool) {
   return (req: Request, res: Response): void => {
     const { worktree, trigger } = req.body as {
       worktree?: string
@@ -15,9 +15,16 @@ export function createSnapshotHandler(db: Database.Database) {
       return
     }
 
-    const targetWorktree = worktree ?? process.cwd()
+    let db
+    try {
+      db = pool.resolve(worktree)
+    } catch {
+      res.status(400).json({ error: 'worktree is required in global mode' })
+      return
+    }
 
     try {
+      const targetWorktree = worktree ?? pool.defaultWorktree ?? process.cwd()
       const taskResult = getActiveTask(db, targetWorktree)
 
       if (!taskResult) {

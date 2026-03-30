@@ -59,6 +59,20 @@ export async function runStart(projectDir: string = process.cwd()): Promise<void
     process.exit(1)
   }
 
+  // Check if port is already in use (global service may be running)
+  try {
+    const resp = await fetch(`http://localhost:${port}/health`)
+    if (resp.ok) {
+      const data = await resp.json() as { mode?: string }
+      const modeStr = data.mode === 'global' ? ' (global service)' : ''
+      console.log(chalk.yellow(`Port ${port} already in use${modeStr}. Engram may already be running.`))
+      console.log(chalk.gray('  Use `engram service status` to check the global service.'))
+      return
+    }
+  } catch {
+    // Port is free — proceed
+  }
+
   console.log(chalk.bold('\nStarting Engram server...\n'))
 
   const child = spawn('node', [serverScript], {

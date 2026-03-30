@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { applyMigrations } from '../db/connection.js'
+import { DbPool } from '../db/pool.js'
 import { readFileSync } from 'fs'
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
@@ -48,4 +49,23 @@ export function createTestGlobalDb(): Database.Database {
 
 export function teardownDb(db: Database.Database): void {
   db.close()
+}
+
+/**
+ * Create a DbPool that routes all worktree paths to the given in-memory test DB.
+ * All get() and resolve() calls return the same test DB regardless of path.
+ */
+export function createTestPool(db: Database.Database): DbPool {
+  const pool = new DbPool(null)
+  // Pre-load a default path so resolve() without args works
+  const DEFAULT = '/test/worktree'
+  pool.set(DEFAULT, db)
+  // Override get() so any path returns the test DB
+  pool.get = (_path: string) => {
+    pool.set(_path, db)
+    return db
+  }
+  // Override resolve() so it always returns the test DB
+  pool.resolve = (_worktree?: string) => db
+  return pool
 }

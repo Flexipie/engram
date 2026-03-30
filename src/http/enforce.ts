@@ -1,8 +1,8 @@
 import type { RequestHandler } from 'express'
-import Database from 'better-sqlite3'
 import { checkConventions, type EnforcementConfig } from '../enforcement/checker.js'
 import { MEMORY_SCOPES, type MemoryScope } from '../db/memories.js'
 import { logger } from '../logger.js'
+import { DbPool } from '../db/pool.js'
 
 export interface EnforcementStats {
   checks: number
@@ -11,12 +11,16 @@ export interface EnforcementStats {
 }
 
 export function createEnforceHandler(
-  db: Database.Database,
+  pool: DbPool,
   config: EnforcementConfig,
   stats: EnforcementStats,
 ): RequestHandler {
   return (req, res): void => {
-    const { file_path, scope } = req.body as { file_path?: string; scope?: string }
+    const { file_path, scope, worktree } = req.body as {
+      file_path?: string
+      scope?: string
+      worktree?: string
+    }
 
     if (!file_path || typeof file_path !== 'string') {
       res.status(400).json({ error: 'file_path is required' })
@@ -26,6 +30,14 @@ export function createEnforceHandler(
     const scopeOverride = scope && (MEMORY_SCOPES as readonly string[]).includes(scope)
       ? (scope as MemoryScope)
       : undefined
+
+    let db
+    try {
+      db = pool.resolve(worktree)
+    } catch {
+      res.status(400).json({ error: 'worktree is required in global mode' })
+      return
+    }
 
     try {
       const result = checkConventions(db, file_path, config, scopeOverride)

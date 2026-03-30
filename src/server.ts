@@ -3,7 +3,7 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js'
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js'
 import { writeFileSync, rmSync, existsSync, mkdirSync } from 'fs'
 import { join } from 'path'
-import { openProjectDb } from './db/connection.js'
+import { homedir } from 'os'
 import { openGlobalDb } from './db/global.js'
 import { loadConfig } from './config.js'
 import { logger } from './logger.js'
@@ -12,50 +12,56 @@ import { createHealthHandler } from './http/health.js'
 import { createHeartbeatHandler } from './http/heartbeat.js'
 import { createSnapshotHandler } from './http/snapshot.js'
 import { createEnforceHandler, type EnforcementStats } from './http/enforce.js'
+import { DbPool } from './db/pool.js'
 
-const projectDir = process.env.ENGRAM_PROJECT_DIR ?? process.cwd()
-const config = loadConfig(projectDir)
+const isGlobal = process.env.ENGRAM_GLOBAL === 'true'
+const projectDir = isGlobal ? null : (process.env.ENGRAM_PROJECT_DIR ?? process.cwd())
+const config = loadConfig(projectDir ?? undefined)
 const port = Number(process.env.ENGRAM_PORT ?? config.port)
 
-// Open DB
-const db = openProjectDb(projectDir)
-const globalDb = config.alwaysIncludeGlobal ? openGlobalDb() : null
+// DB pool: global mode has no default (resolved per request); project mode pre-opens the project DB
+const pool = new DbPool(projectDir)
 
-// Write PID and running info
-const engramDir = join(projectDir, '.engram')
-if (!existsSync(engramDir)) {
-  mkdirSync(engramDir, { recursive: true })
+// Global DB: always open in global mode; conditional in project mode
+const globalDb = (isGlobal || config.alwaysIncludeGlobal) ? openGlobalDb() : null
+
+// Determine base dir for PID/running files
+const baseDir = isGlobal ? join(homedir(), '.engram') : join(projectDir!, '.engram')
+if (!existsSync(baseDir)) {
+  mkdirSync(baseDir, { recursive: true })
 }
 
-const pidFile = join(engramDir, 'engram.pid')
-const runningFile = join(engramDir, 'running.json')
+const pidFile = join(baseDir, 'engram.pid')
+const runningFile = join(baseDir, 'running.json')
 
 writeFileSync(pidFile, String(process.pid), 'utf-8')
 
 // In-memory enforcement stats (reset on restart)
 export const enforcementStats: EnforcementStats = { checks: 0, violations: 0, warnings: 0 }
 
+const mode = isGlobal ? 'global' : 'project'
+
 // Express app
 const app = express()
 app.use(express.json())
 
 // Health endpoint
-app.get('/health', createHealthHandler(db, enforcementStats))
+app.get('/health', createHealthHandler(pool, enforcementStats, mode))
 
 // Heartbeat endpoint
-app.post('/heartbeat', createHeartbeatHandler(db))
+app.post('/heartbeat', createHeartbeatHandler(pool))
 
 // Snapshot endpoint
-app.post('/snapshot', createSnapshotHandler(db))
+app.post('/snapshot', createSnapshotHandler(pool))
 
 // Convention enforcement endpoint
-app.post('/enforce', createEnforceHandler(db, config, enforcementStats))
+app.post('/enforce', createEnforceHandler(pool, config, enforcementStats))
 
 // MCP streamable HTTP transport
 app.post('/mcp', async (req, res) => {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
   const server = new McpServer({ name: 'engram', version: '0.1.0' })
-  setupTools(server, db, globalDb)
+  setupTools(server, pool, globalDb)
   await server.connect(transport)
   await transport.handleRequest(req, res, req.body)
 })
@@ -66,16 +72,18 @@ const httpServer = app.listen(port, () => {
     pid: process.pid,
     port,
     started_at: new Date().toISOString(),
+    mode,
+    project_dir: projectDir,
   }
   writeFileSync(runningFile, JSON.stringify(runningInfo, null, 2), 'utf-8')
-  logger.info(`Engram server listening on port ${port}`, { pid: process.pid, port })
+  logger.info(`Engram server listening on port ${port}`, { pid: process.pid, port, mode })
 })
 
 // Graceful shutdown
 function shutdown(): void {
   logger.info('Shutting down...')
   httpServer.close(() => {
-    db.close()
+    pool.closeAll()
     if (globalDb) globalDb.close()
     if (existsSync(pidFile)) rmSync(pidFile)
     if (existsSync(runningFile)) rmSync(runningFile)
@@ -87,4 +95,4 @@ function shutdown(): void {
 process.on('SIGTERM', shutdown)
 process.on('SIGINT', shutdown)
 
-export { app, db }
+export { app }

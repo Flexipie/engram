@@ -1,9 +1,9 @@
 import type { Request, Response } from 'express'
-import Database from 'better-sqlite3'
 import { upsertWorktreeActivity } from '../db/worktrees.js'
 import { logger } from '../logger.js'
+import { DbPool } from '../db/pool.js'
 
-export function createHeartbeatHandler(db: Database.Database) {
+export function createHeartbeatHandler(pool: DbPool) {
   return (req: Request, res: Response): void => {
     const { worktree, task_id, active_files } = req.body as {
       worktree: string
@@ -17,6 +17,7 @@ export function createHeartbeatHandler(db: Database.Database) {
     }
 
     try {
+      const db = pool.resolve(worktree)
       upsertWorktreeActivity(db, worktree, task_id, active_files)
       res.json({ ok: true })
     } catch (err) {

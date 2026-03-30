@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import type { Request, Response } from 'express'
-import { createTestDb, teardownDb } from '../setup.js'
+import { createTestDb, createTestPool, teardownDb } from '../setup.js'
 import { createHeartbeatHandler } from '../../http/heartbeat.js'
 import { getActiveWorktrees, pruneStale } from '../../db/worktrees.js'
 
@@ -27,14 +27,14 @@ describe('POST /heartbeat handler', () => {
   })
 
   it('returns 400 when worktree is missing', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({})
     handler(req, res as unknown as Response)
     expect(res.statusCode).toBe(400)
   })
 
   it('returns { ok: true } on valid heartbeat', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({ worktree: '/projects/app' })
     handler(req, res as unknown as Response)
     expect(res.statusCode).toBe(200)
@@ -42,7 +42,7 @@ describe('POST /heartbeat handler', () => {
   })
 
   it('creates a worktree_activity row on first heartbeat', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({ worktree: '/projects/app' })
     handler(req, res as unknown as Response)
 
@@ -52,7 +52,7 @@ describe('POST /heartbeat handler', () => {
   })
 
   it('upserts — multiple heartbeats from same worktree produce one row', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const body = { worktree: '/projects/app' }
     handler({ body } as Request, mockReqRes(body).res as unknown as Response)
     handler({ body } as Request, mockReqRes(body).res as unknown as Response)
@@ -63,7 +63,7 @@ describe('POST /heartbeat handler', () => {
   })
 
   it('stores active_files from heartbeat', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({
       worktree: '/projects/app',
       active_files: ['src/api/handler.ts', 'src/db/schema.ts'],
@@ -76,7 +76,7 @@ describe('POST /heartbeat handler', () => {
   })
 
   it('stores task_id from heartbeat', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({
       worktree: '/projects/app',
       task_id: 'task-abc-123',
@@ -88,7 +88,7 @@ describe('POST /heartbeat handler', () => {
   })
 
   it('updates last_heartbeat on subsequent calls', async () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const body = { worktree: '/projects/app' }
 
     handler({ body } as Request, mockReqRes(body).res as unknown as Response)
@@ -129,7 +129,7 @@ describe('pruneStale', () => {
   })
 
   it('keeps worktrees with recent last_heartbeat', () => {
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({ worktree: '/projects/app' })
     handler(req, res as unknown as Response)
 
@@ -144,7 +144,7 @@ describe('pruneStale', () => {
       'INSERT INTO worktree_activity (worktree, task_id, active_files, last_heartbeat) VALUES (?, ?, ?, ?)',
     ).run('/stale/worktree', null, '[]', staleTime)
 
-    const handler = createHeartbeatHandler(db)
+    const handler = createHeartbeatHandler(createTestPool(db))
     const { req, res } = mockReqRes({ worktree: '/projects/fresh' })
     handler(req, res as unknown as Response)
 

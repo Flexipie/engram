@@ -1,11 +1,14 @@
 import { existsSync, readFileSync, rmSync } from 'fs'
 import { join } from 'path'
+import { homedir } from 'os'
 import chalk from 'chalk'
 
 interface RunningInfo {
   pid: number
   port: number
   started_at: string
+  mode?: 'global' | 'project'
+  project_dir?: string | null
 }
 
 async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
@@ -23,8 +26,18 @@ async function waitForExit(pid: number, timeoutMs: number): Promise<boolean> {
 }
 
 export async function runStop(projectDir: string = process.cwd()): Promise<void> {
-  const engramDir = join(projectDir, '.engram')
-  const runningFile = join(engramDir, 'running.json')
+  // Check global service first (~/.engram/running.json), then per-project
+  const globalRunningFile = join(homedir(), '.engram', 'running.json')
+  const projectRunningFile = join(projectDir, '.engram', 'running.json')
+
+  const runningFile = existsSync(globalRunningFile)
+    ? globalRunningFile
+    : projectRunningFile
+
+  const engramDir = existsSync(globalRunningFile)
+    ? join(homedir(), '.engram')
+    : join(projectDir, '.engram')
+
   const pidFile = join(engramDir, 'engram.pid')
 
   if (!existsSync(runningFile)) {

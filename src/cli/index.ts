@@ -8,6 +8,8 @@ import { runTask } from './commands/task.js'
 import { runMemories } from './commands/memories.js'
 import { runInvalidate } from './commands/invalidate.js'
 import { runErrors } from './commands/errors.js'
+import { runServiceInstall, runServiceUninstall, runServiceStatus } from './commands/service.js'
+import { runUpdateClaudeMd } from './commands/update-claude-md.js'
 
 const program = new Command()
 
@@ -77,6 +79,38 @@ program
   .option('--verbose', 'Show normalized form and cause fields')
   .action(async (options: { scope?: string; json?: boolean; verbose?: boolean }) => {
     await runErrors(options)
+  })
+
+const serviceCmd = program
+  .command('service')
+  .description('Manage the global Engram launchd service (macOS only)')
+
+serviceCmd
+  .command('install')
+  .description('Install and start the global Engram service via launchd')
+  .action(async () => {
+    await runServiceInstall()
+  })
+
+serviceCmd
+  .command('uninstall')
+  .description('Stop and remove the global Engram service')
+  .action(async () => {
+    await runServiceUninstall()
+  })
+
+serviceCmd
+  .command('status')
+  .description('Show global service status')
+  .action(async () => {
+    await runServiceStatus()
+  })
+
+program
+  .command('update-claude-md')
+  .description('Re-inject the latest Engram snippet into CLAUDE.md (idempotent)')
+  .action(async () => {
+    await runUpdateClaudeMd()
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {

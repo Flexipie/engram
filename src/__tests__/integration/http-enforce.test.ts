@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
 import type { Request, Response } from 'express'
-import { createTestDb, teardownDb } from '../setup.js'
+import { createTestDb, createTestPool, teardownDb } from '../setup.js'
 import { createEnforceHandler, type EnforcementStats } from '../../http/enforce.js'
 import { handleCheckConventions } from '../../mcp/handlers/enforce.js'
 import { insertMemory } from '../../db/memories.js'
@@ -34,14 +34,14 @@ describe('POST /enforce handler', () => {
   })
 
   it('returns 400 when file_path is missing', () => {
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({})
     handler(req, res as unknown as Response)
     expect(res.statusCode).toBe(400)
   })
 
   it('returns 200 with empty violations/warnings for unknown file', () => {
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     expect(res.statusCode).toBe(200)
@@ -61,7 +61,7 @@ describe('POST /enforce handler', () => {
     db.prepare('UPDATE memories SET last_validated = ? WHERE id = ?').run(
       new Date().toISOString(), id,
     )
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     expect(res.statusCode).toBe(200)
@@ -77,7 +77,7 @@ describe('POST /enforce handler', () => {
       content: 'Prefer named exports',
       confidence: 0.5,
     })
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     const body = res.body as { violations: string[]; warnings: string[] }
@@ -92,7 +92,7 @@ describe('POST /enforce handler', () => {
       content: 'Blocking rule',
       confidence: 0.99,
     })
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     // HTTP always 200 — exit code decision belongs to caller
@@ -101,7 +101,7 @@ describe('POST /enforce handler', () => {
 
   it('increments stats.checks on each call', () => {
     const stats = makeStats()
-    const handler = createEnforceHandler(db, CONFIG, stats)
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, stats)
     const { req: r1, res: rs1 } = mockReqRes({ file_path: 'src/api/a.ts' })
     const { req: r2, res: rs2 } = mockReqRes({ file_path: 'src/api/b.ts' })
     handler(r1, rs1 as unknown as Response)
@@ -117,7 +117,7 @@ describe('POST /enforce handler', () => {
       confidence: 0.99,
     })
     const stats = makeStats()
-    const handler = createEnforceHandler(db, CONFIG, stats)
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, stats)
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     expect(stats.violations).toBeGreaterThan(0)
@@ -134,7 +134,7 @@ describe('POST /enforce handler', () => {
     const hundredDaysAgo = new Date(Date.now() - 100 * 24 * 60 * 60 * 1000).toISOString()
     db.prepare('UPDATE memories SET last_validated = ? WHERE id = ?').run(hundredDaysAgo, id)
 
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     const body = res.body as { violations: string[] }
@@ -142,7 +142,7 @@ describe('POST /enforce handler', () => {
   })
 
   it('returns scope and memories_checked in response', () => {
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
     handler(req, res as unknown as Response)
     const body = res.body as { scope: string; memories_checked: number }
@@ -157,7 +157,7 @@ describe('POST /enforce handler', () => {
       content: 'Use transactions',
       confidence: 0.99,
     })
-    const handler = createEnforceHandler(db, CONFIG, makeStats())
+    const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts', scope: 'database' })
     handler(req, res as unknown as Response)
     const body = res.body as { violations: string[]; scope: string }

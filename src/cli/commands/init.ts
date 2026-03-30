@@ -2,6 +2,7 @@ import { mkdirSync, existsSync, writeFileSync, readFileSync, copyFileSync, chmod
 import { join, dirname } from 'path'
 import { fileURLToPath } from 'url'
 import chalk from 'chalk'
+import { injectClaudeMd as doInjectClaudeMd } from '../utils/inject-claude-md.js'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 
@@ -15,63 +16,15 @@ const DEFAULT_CONFIG = {
   blockThreshold: 0.8,
 }
 
-const SENTINEL_START = '<!-- engram:start -->'
-const SENTINEL_END = '<!-- engram:end -->'
-
-function getSnippet(): string {
-  const templatePath = join(__dirname, '../../templates/claude-snippet.md')
-  if (existsSync(templatePath)) {
-    return readFileSync(templatePath, 'utf-8')
-  }
-  return `${SENTINEL_START}
-## Engram — Project Intelligence
-
-You have access to an Engram MCP server at http://localhost:7337/mcp that provides persistent project memory across sessions and compactions.
-
-**At the start of every session:**
-1. Call \`session_start()\` — resumes your previous task state if it exists, loads relevant memories
-2. Review the returned \`task\` object — this is your previous state, continue from here
-
-**During the session:**
-- After completing a discrete piece of work, call \`update_task()\` with your progress
-- When you learn something about this codebase that should persist, call \`remember()\`
-- When you encounter a build error or test failure, call \`check_error()\` BEFORE diagnosing
-- After resolving an error, call \`record_error()\` with the cause and fix
-- When about to modify a file another worktree may be touching, call \`get_worktree_status()\` first
-
-**The goal:** Every session makes the next session smarter. Treat Engram as your project notebook.
-${SENTINEL_END}
-`
-}
-
 function injectClaudeMd(projectDir: string): void {
-  const claudeMdPath = join(projectDir, 'CLAUDE.md')
-  const snippet = getSnippet()
-
-  if (!existsSync(claudeMdPath)) {
-    writeFileSync(claudeMdPath, snippet, 'utf-8')
+  const result = doInjectClaudeMd(projectDir)
+  if (result === 'created') {
     console.log(chalk.green('  Created CLAUDE.md with Engram snippet'))
-    return
+  } else if (result === 'updated') {
+    console.log(chalk.green('  Updated Engram snippet in CLAUDE.md'))
+  } else {
+    console.log(chalk.gray('  CLAUDE.md Engram snippet already up to date'))
   }
-
-  const content = readFileSync(claudeMdPath, 'utf-8')
-
-  if (content.includes(SENTINEL_START)) {
-    // Already has sentinel — replace content between sentinels
-    const startIdx = content.indexOf(SENTINEL_START)
-    const endIdx = content.indexOf(SENTINEL_END)
-    if (startIdx !== -1 && endIdx !== -1) {
-      const before = content.slice(0, startIdx)
-      const after = content.slice(endIdx + SENTINEL_END.length)
-      writeFileSync(claudeMdPath, before + snippet + after, 'utf-8')
-      console.log(chalk.green('  Updated Engram snippet in CLAUDE.md (idempotent)'))
-    }
-    return
-  }
-
-  // Append snippet
-  writeFileSync(claudeMdPath, content + '\n\n' + snippet, 'utf-8')
-  console.log(chalk.green('  Injected Engram snippet into CLAUDE.md'))
 }
 
 function mergeSettingsJson(projectDir: string): void {

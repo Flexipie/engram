@@ -5,7 +5,7 @@ Universal convention memory layer for agentic AI. Any agent, any domain, any tea
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility strategy.
 
-## Status: Phase 4 + 5 Complete ✓
+## Status: Phase 4 + 5 Complete ✓ | Global Service Installer Complete ✓
 
 ---
 
@@ -132,6 +132,35 @@ Rationale: works at session start before the agent has sent any heartbeats.
 
 ---
 
+---
+
+## Global Server + Service Installer ✓ DONE
+
+**Goal:** Install once, works everywhere. One global launchd service on port 7337 serving any project on demand.
+
+### Completed
+- [x] `src/db/pool.ts` — `DbPool` class: on-demand project DB opening, `resolve(worktree)`, `getAllDbs()`, `closeAll()`
+- [x] `src/server.ts` — global mode via `ENGRAM_GLOBAL=true`, `DbPool` replaces single `db`, `running.json` gains `mode` + `project_dir`
+- [x] `src/mcp/tools.ts` — `setupTools(server, pool, globalDb)`, all 9 tools get optional `worktree` param, pool-based routing
+- [x] HTTP handlers pool-based: `createHeartbeatHandler(pool)`, `createEnforceHandler(pool, ...)`, `createHealthHandler(pool, ...)`, `createSnapshotHandler(pool)`
+- [x] `src/service/installer.ts` — `generatePlist()`, `getServiceLabel()`, `getPlistPath()` (pure, testable)
+- [x] `src/cli/commands/service.ts` — `engram service install/uninstall/status`
+- [x] `src/cli/utils/inject-claude-md.ts` — extracted from init.ts, returns `'created' | 'updated' | 'unchanged'`
+- [x] `src/cli/commands/update-claude-md.ts` — `engram update-claude-md`
+- [x] `src/cli/commands/init.ts` — uses shared inject-claude-md utility
+- [x] `src/cli/commands/start.ts` — checks if port already in use before spawning
+- [x] `src/cli/commands/stop.ts` — checks `~/.engram/running.json` (global) before per-project
+- [x] `src/cli/index.ts` — registers `service` subcommands + `update-claude-md`
+- [x] `hooks/enforce.sh` — adds `worktree=$(git rev-parse --show-toplevel)` to POST body
+- [x] 185 tests passing (26 new: 8 db-pool + 10 service-installer + 8 update-claude-md)
+
+### Architecture
+- Global mode: one server, DbPool opens project DBs on demand per request, PID at `~/.engram/running.json`
+- Per-project mode: unchanged — pool pre-opens one DB, all existing behaviour preserved
+- Backward compatible: all hooks work with or without worktree in body (per-project uses default)
+
+---
+
 ## Phase 6 — Dynamic Scopes + Domain Profiles
 
 **Goal:** Break out of hardcoded software scopes. Any domain can configure Engram for its context.
@@ -194,7 +223,7 @@ Rationale: works at session start before the agent has sent any heartbeats.
 Items identified from design review, not phase-assigned yet:
 
 - [ ] **Per-tool telemetry** — extend `EnforcementStats` pattern to all MCP tools. Track: session_start hit/miss rate on task, check_error hit rate, recall query patterns, remember call volume by type/scope. Expose via `/health` or new `/stats` endpoint.
-- [ ] **`engram update-claude-md`** — re-inject latest CLAUDE.md template into existing projects using sentinel markers. Needed so improvements to the template reach projects that ran `engram init` earlier.
+- [x] **`engram update-claude-md`** — re-inject latest CLAUDE.md template into existing projects using sentinel markers. Needed so improvements to the template reach projects that ran `engram init` earlier.
 - [ ] **Global memory decision rule** — auto-promote a memory to global after it appears in N≥3 distinct projects with confidence≥0.7. Today agents must decide manually via `global: true`.
 - [ ] **`update_task` tool description** — explicitly document create-on-missing behaviour so agents starting fresh know to call it. Consider alias `sync_task`.
 - [ ] **CLAUDE.md template length** — current template is concise post-Phase-5. Monitor if agents are following the error workflow (check_error first) in practice. Tighten further if not.

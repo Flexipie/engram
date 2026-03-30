@@ -1,23 +1,26 @@
 import type { RequestHandler } from 'express'
-import Database from 'better-sqlite3'
 import type { EnforcementStats } from './enforce.js'
 import { getActiveWorktrees } from '../db/worktrees.js'
+import { DbPool } from '../db/pool.js'
 
 const startTime = Date.now()
 
 export function createHealthHandler(
-  db: Database.Database,
+  pool: DbPool,
   stats: EnforcementStats,
+  mode: 'global' | 'project' = 'project',
 ): RequestHandler {
   return (_req, res): void => {
-    const activeWorktrees = getActiveWorktrees(db)
+    const allDbs = pool.getAllDbs()
+    const activeWorktreesCount = allDbs.flatMap((db) => getActiveWorktrees(db)).length
     res.json({
       status: 'ok',
       pid: process.pid,
       uptime: Math.floor((Date.now() - startTime) / 1000),
       version: '0.1.0',
       name: 'engram',
-      active_worktrees: activeWorktrees.length,
+      mode,
+      active_worktrees: activeWorktreesCount,
       enforcement: {
         checks: stats.checks,
         violations: stats.violations,
