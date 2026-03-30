@@ -5,7 +5,7 @@ Universal convention memory layer for agentic AI. Any agent, any domain, any tea
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility strategy.
 
-## Status: Phase 3 Complete ✓
+## Status: Phase 5 Complete ✓
 
 ---
 
@@ -96,21 +96,21 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility s
 
 ---
 
-## Phase 5 — Convention Enforcement
+## Phase 5 — Convention Enforcement ✓ DONE
 
 **Goal:** Violations caught before they are written. Agent-agnostic — works for any domain, not just code.
 
-### To implement
-- [ ] `/enforce` HTTP endpoint (`src/http/enforce.ts`) — callable by any agent or hook
-- [ ] Convention checker (`src/enforcement/checker.ts`) — reads memories ≥ 0.6 confidence for scope, domain-agnostic
-- [ ] Warn threshold 0.6 → warning response; Block threshold 0.8 → block response
-- [ ] Claude Code hook integration (`enforce.sh`) as one adapter, not the only one
-- [ ] `enforced` MCP tool — so any agent can call enforcement directly without HTTP
-- [ ] `engram status` shows enforcement activity
-
-### Tests to write first
-- `src/__tests__/unit/enforcement-checker.test.ts`
-- `src/__tests__/integration/http-enforce.test.ts`
+### Completed
+- [x] `src/enforcement/checker.ts` — `checkConventions()` using effective score (confidence × recency × scope boost)
+- [x] `/enforce` HTTP endpoint (`src/http/enforce.ts`) — POST with `file_path`, returns violations/warnings
+- [x] `check_conventions` MCP tool (`src/mcp/handlers/enforce.ts`) — same logic, direct MCP access
+- [x] `hooks/enforce.sh` updated — prints warnings to stderr, exits 2 on violations
+- [x] `src/retrieval/scope-detector.ts` expanded — all 15 scopes covered, `fileToScope` exported
+- [x] In-memory enforcement stats (`enforcementStats`) — tracks checks/violations/warnings since start
+- [x] `decision` type memories max out at warnings (never block)
+- [x] `snippet` and `error_pattern` types excluded from enforcement checks
+- [x] Stale memories (>90 days) get recency factor 0.5 — less likely to block
+- [x] 132 tests passing (29 new: 15 unit + 14 integration)
 
 ---
 

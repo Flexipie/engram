@@ -4,7 +4,9 @@ import Database from 'better-sqlite3'
 import { handleSessionStart, handleUpdateTask } from './handlers/session.js'
 import { handleRemember, handleRecall, handleInvalidate } from './handlers/memory.js'
 import { handleCheckError, handleRecordError } from './handlers/error.js'
+import { handleCheckConventions } from './handlers/enforce.js'
 import { MEMORY_TYPES, MEMORY_SCOPES } from '../db/memories.js'
+import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
 
 export function setupTools(
@@ -12,6 +14,8 @@ export function setupTools(
   db: Database.Database,
   globalDb?: Database.Database | null,
 ): void {
+  const enforcementConfig = loadConfig(process.cwd())
+
   server.tool(
     'session_start',
     'Start or resume a session, loading task state and relevant memories',
@@ -176,6 +180,25 @@ export function setupTools(
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('invalidate failed', err)
+        throw err
+      }
+    },
+  )
+
+  server.tool(
+    'check_conventions',
+    'Check stored conventions and anti-patterns for a file path before writing — returns violations (blocking) and warnings (informational)',
+    {
+      file_path: z.string().describe('Path of the file about to be written'),
+      content: z.string().optional().describe('File content (reserved — not used in Phase 5)'),
+      scope: z.enum(MEMORY_SCOPES).optional().describe('Scope override (auto-detected from path if omitted)'),
+    },
+    async (params) => {
+      try {
+        const result = await handleCheckConventions(db, enforcementConfig, params)
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      } catch (err) {
+        logger.error('check_conventions failed', err)
         throw err
       }
     },

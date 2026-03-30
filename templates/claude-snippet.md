@@ -20,6 +20,11 @@ You have access to an Engram MCP server at http://localhost:7337/mcp. Engram is 
   - `recall({ types: ["anti_pattern"] })` — just anti-patterns
 - When a memory is wrong or outdated → `invalidate({ id: "...", reason: "..." })`
 
+**Before writing a file:**
+- `check_conventions({ file_path: "src/api/handler.ts" })` — returns `{ violations[], warnings[] }`
+  - If `violations` is non-empty → fix the issues before writing (conventions are being enforced)
+  - If `warnings` is non-empty → review before proceeding (informational)
+
 **When you encounter an error:**
 1. `check_error({ error_raw: "<full error text>" })` — if `found: true`, use the returned `fix` immediately
 2. After resolving → `record_error({ error_raw: "...", cause: "...", fix: "..." })`

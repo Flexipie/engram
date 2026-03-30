@@ -11,6 +11,7 @@ import { setupTools } from './mcp/tools.js'
 import { healthHandler } from './http/health.js'
 import { createHeartbeatHandler } from './http/heartbeat.js'
 import { createSnapshotHandler } from './http/snapshot.js'
+import { createEnforceHandler, type EnforcementStats } from './http/enforce.js'
 
 const projectDir = process.env.ENGRAM_PROJECT_DIR ?? process.cwd()
 const config = loadConfig(projectDir)
@@ -31,6 +32,9 @@ const runningFile = join(engramDir, 'running.json')
 
 writeFileSync(pidFile, String(process.pid), 'utf-8')
 
+// In-memory enforcement stats (reset on restart)
+export const enforcementStats: EnforcementStats = { checks: 0, violations: 0, warnings: 0 }
+
 // Express app
 const app = express()
 app.use(express.json())
@@ -43,6 +47,9 @@ app.post('/heartbeat', createHeartbeatHandler(db))
 
 // Snapshot endpoint
 app.post('/snapshot', createSnapshotHandler(db))
+
+// Convention enforcement endpoint
+app.post('/enforce', createEnforceHandler(db, config, enforcementStats))
 
 // MCP streamable HTTP transport
 app.post('/mcp', async (req, res) => {

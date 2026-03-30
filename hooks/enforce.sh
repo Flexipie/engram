@@ -8,9 +8,13 @@ if [ "$TOOL_NAME" = "Write" ]; then
       -H "Content-Type: application/json" \
       -d "{\"file_path\": \"$FILE_PATH\"}" \
       --max-time 2)
+    WARNINGS=$(echo "$RESULT" | jq -r '.warnings // [] | length')
+    if [ "$WARNINGS" -gt 0 ] 2>/dev/null; then
+      echo "$RESULT" | jq -r '.warnings[] | "ENGRAM WARNING: " + .' >&2
+    fi
     VIOLATIONS=$(echo "$RESULT" | jq -r '.violations // [] | length')
     if [ "$VIOLATIONS" -gt 0 ] 2>/dev/null; then
-      echo "$RESULT" | jq -r '.violations[] | "ENGRAM CONVENTION VIOLATION: " + .' >&2
+      echo "$RESULT" | jq -r '.violations[] | "ENGRAM VIOLATION: " + .' >&2
       exit 2
     fi
   fi
