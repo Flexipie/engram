@@ -5,11 +5,13 @@
 
 ## 1. Vision
 
-Engram is a local-first MCP server that gives AI coding agents persistent, compounding intelligence about your project. It solves the two most painful problems in AI-assisted development today: agents that forget everything between sessions, and agents that never get smarter about how you specifically build things.
+Engram is a universal agent memory architecture. Any agent — Claude Code, Cursor, LangGraph, AutoGen, a custom HTTP client — can call Engram to persist what it learns and recall what came before, so every session builds on the last.
 
-The goal is not to patch around limitations of existing tools. It is to build the infrastructure layer that sits underneath every agent session — the persistent nervous system that makes every agent interaction smarter than the last, regardless of which tool you're using.
+The goal is not to patch around limitations of existing tools. It is to build the infrastructure layer that sits underneath every agent session — the persistent nervous system that makes every agent interaction smarter than the last, regardless of which tool, domain, or team you're working with.
 
-**One sentence:** Engram is the memory and intelligence layer that turns your AI coding agent from a smart stranger into a senior developer who knows your codebase.
+The stack: local MCP + REST today → TypeScript/Python SDK → cloud sync → memory marketplace.
+
+**One sentence:** Engram is the memory protocol that turns any AI agent from a smart stranger into a domain expert that knows your project, your team, and your conventions.
 
 ---
 
@@ -50,6 +52,9 @@ The incumbent. A manually written markdown file loaded at session start.
 Store and retrieve unstructured text snippets via semantic search.
 
 **Why they fail:** Unstructured text blobs with no understanding of knowledge type. The agent must call `remember` explicitly and often does not. No codebase awareness — they store conversation notes, not project intelligence. Start empty, require manual population. Retrieval via semantic search is imprecise for structured project knowledge. Not project-scoped — account-level, not repository-level.
+
+### Graph databases (Neo4j) and vector stores
+Infrastructure primitives, not memory protocols. They are also the wrong retrieval model for structured project knowledge. A convention like "always use Zod at API boundaries" should be retrieved by scope and type, not by vector similarity to an arbitrary query string. Vector search is an enhancement on top of structured retrieval — not a replacement for it. Engram adds optional semantic retrieval (Phase 8) as a layer on top of its FTS5 foundation.
 
 ### Cursor codebase indexing
 Semantic search over your codebase. "Find where auth is handled."
@@ -203,7 +208,7 @@ CREATE INDEX idx_corrections_scope ON corrections(scope);
 
 ## 6. MCP Tool Surface
 
-Five agent-facing tools. No more. Simple enough that any agent can hold the entire API in working memory.
+Nine agent-facing tools. Simple enough that any agent can hold the entire API in working memory.
 
 ```typescript
 // ── MEMORY TOOLS ──────────────────────────────────────────
@@ -497,7 +502,7 @@ Project intelligence memories are shared across all worktrees — they belong to
 Being explicit about scope boundaries matters.
 
 - **Does not store your code.** Only metadata: conventions, decisions, error signatures, task descriptions. Never file contents.
-- **Does not call external APIs.** Fully local. No telemetry, no cloud sync in Phase 1.
+- **Does not call external APIs in base config.** Fully local by default. The optional observer sidecar (Phase 9) can call a local Ollama instance or the Anthropic API for automatic memory extraction — both require explicit opt-in configuration.
 - **Does not coordinate agents.** Cross-worktree awareness is read-only. Agents see what others are doing. They do not send messages to each other or block each other's work.
 - **Does not replace CLAUDE.md.** It augments it. The CLAUDE.md instructions tell the agent to use Engram. Engram then provides the dynamic content that the CLAUDE.md cannot.
 - **Does not work without agent cooperation.** The system improves with use. A session where the agent never calls Engram tools adds no value. The hooks and CLAUDE.md instructions are designed to maximise cooperation, but they are not foolproof.
@@ -506,86 +511,20 @@ Being explicit about scope boundaries matters.
 
 ## 12. Phase Roadmap
 
-### Phase 1 — Session State (Week 1–2)
-**Goal:** Solve the compaction problem. Ship something immediately useful.
-
-Deliverables:
-- MCP server scaffold (Node.js/TypeScript, `@modelcontextprotocol/sdk`)
-- SQLite setup with `tasks`, `task_state`, `snapshots` tables only
-- Three tools: `get_task`, `update_task`, `snapshot` (manual trigger only)
-- Claude Code `PreCompact` hook auto-snapshot
-- `engram init`, `engram start`, `engram task` CLI commands
-- CLAUDE.md template added by `engram init`
-
-Success criteria: Start a session, work for 30 minutes, trigger a compaction manually, verify the agent resumes with correct state. Do this three times on your own projects.
-
----
-
-### Phase 2 — Project Memory (Week 3–4)
-**Goal:** The agent stops making the same mistakes.
-
-Deliverables:
-- `memories` and `corrections` tables
-- `remember`, `recall`, `invalidate` tools
-- Memory confidence scoring and decay logic
-- `engram memories`, `engram invalidate` CLI commands
-- Updated CLAUDE.md template with recall instructions
-
-Success criteria: After one week of normal use on a project, `engram memories` shows at least 20 conventions that are specific enough to meaningfully guide agent behaviour. Verify by starting a fresh session and checking that the agent follows project patterns without being told.
-
----
-
-### Phase 3 — Error Intelligence (Week 5)
-**Goal:** Known errors resolve instantly.
-
-Deliverables:
-- `error_patterns` table
-- `log_error` tool (two-phase: check then record)
-- `engram errors` CLI command
-- Agent instruction to call `log_error` before diagnosing any build failure or test error
-
-Success criteria: Encounter a recurring error in a project. Verify that on the second occurrence, the agent retrieves the fix from Engram rather than re-diagnosing.
-
----
-
-### Phase 4 — Convention Enforcement (Week 6–7)
-**Goal:** Violations are caught before they are written.
-
-Deliverables:
-- Internal `/enforce` HTTP endpoint (not an MCP tool)
-- Claude Code `PreToolCall` hook for Write operations
-- Enforcement only fires for memories with confidence > 0.8
-- Violations surfaced as warnings (confidence 0.6–0.8) or blocks (> 0.8)
-- `engram status` shows enforcement activity
-
-Success criteria: Create a high-confidence convention ("always use named exports"). Have the agent attempt to write a file with a default export. Verify enforcement fires and surfaces the violation.
-
----
-
-### Phase 5 — Cross-Worktree Awareness (Week 8)
-**Goal:** Parallel agents are not invisible to each other.
-
-Deliverables:
-- `worktree_activity` table
-- `get_worktree_status` tool
-- Background heartbeat (2-minute interval via hook)
-- Agent instruction to check for file conflicts before modifying shared files
-- `engram task --all` CLI showing all active worktrees
-
-Success criteria: Have two Claude Code sessions active in different worktrees, both touching the same file. Verify that each agent can see the other's activity via `get_worktree_status`.
-
----
-
-### Phase 6 — Bootstrap & Polish (Week 9–10)
-**Goal:** Day-one value without needing to accumulate memories first.
-
-Deliverables:
-- `engram bootstrap` command: AST analysis via `ts-morph`, pattern extraction, AI synthesis
-- Seeded conventions from codebase analysis, confidence 0.5 (validated over time)
-- `engram gc` maintenance command
-- `engram export` backup command
-- Installable as `npm install -g engram`
-- README + setup guide
+| Phase | Goal | Status |
+|---|---|---|
+| 1 — Session State | Solve compaction. Agents resume after context reset. | ✓ Done |
+| 2 — Project Memory | Agent stops making same mistakes. FTS5 recall, confidence scoring. | ✓ Done |
+| 3 — Error Intelligence | Known errors resolve instantly. Signature-based lookup. | ✓ Done |
+| 4 — Cross-Worktree Awareness | Parallel agents are visible to each other. | ✓ Done |
+| 5 — Convention Enforcement | Violations caught before write via hook interception. | ✓ Done |
+| 6 — Dynamic Scopes + Domain Profiles + Bootstrap/GC/Export | Break software-only coupling. Any domain can use Engram. | ✓ Done |
+| 7 — Full REST API | Any HTTP client can use Engram without MCP. | ✓ Done |
+| 8 — Semantic Retrieval | Find memories by meaning. Vector KNN + contradiction detection. | Planned |
+| 9 — Auto-Extraction Observer | Engram learns passively from tool events via local LLM. | ✓ Done |
+| 10 — TypeScript/Python SDK | Embed Engram in any agent framework with 3 lines of code. | Planned |
+| 11 — Cloud Sync + Team Memory | Shared knowledge base across team members and machines. | Planned |
+| 12 — Memory Marketplace | Community-sourced convention packs. Bootstrap any project instantly. | Planned |
 
 ---
 

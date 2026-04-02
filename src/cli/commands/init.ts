@@ -14,6 +14,7 @@ const DEFAULT_CONFIG = {
   globalMemoryCap: 5,
   warnThreshold: 0.6,
   blockThreshold: 0.8,
+  domain: 'software',
 }
 
 function injectClaudeMd(projectDir: string): void {
@@ -93,7 +94,7 @@ function mergeSettingsJson(projectDir: string): void {
     hooks['PreCompact'] = preCompact
   }
 
-  // PostToolUse — heartbeat.sh
+  // PostToolUse — heartbeat.sh + observer.sh
   const postToolUse = (hooks['PostToolUse'] ?? []) as unknown[]
   if (!hasHook(postToolUse, 'heartbeat.sh')) {
     postToolUse.push({
@@ -106,13 +107,24 @@ function mergeSettingsJson(projectDir: string): void {
     })
     hooks['PostToolUse'] = postToolUse
   }
+  if (!hasHook(postToolUse, 'observer.sh')) {
+    postToolUse.push({
+      hooks: [
+        {
+          type: 'command',
+          command: engramHookPath('observer.sh'),
+        },
+      ],
+    })
+    hooks['PostToolUse'] = postToolUse
+  }
 
   settings['hooks'] = hooks
   writeFileSync(settingsPath, JSON.stringify(settings, null, 2), 'utf-8')
   console.log(chalk.green('  Updated .claude/settings.json with Engram hooks'))
 }
 
-export async function runInit(projectDir: string = process.cwd()): Promise<void> {
+export async function runInit(projectDir: string = process.cwd(), domain = 'software'): Promise<void> {
   console.log(chalk.bold('\nEngram init\n'))
 
   // 1. Create .engram/
@@ -123,17 +135,24 @@ export async function runInit(projectDir: string = process.cwd()): Promise<void>
   // 2. Create .engram/config.json
   const configPath = join(engramDir, 'config.json')
   if (!existsSync(configPath)) {
-    writeFileSync(configPath, JSON.stringify(DEFAULT_CONFIG, null, 2), 'utf-8')
+    const config = { ...DEFAULT_CONFIG, domain }
+    writeFileSync(configPath, JSON.stringify(config, null, 2), 'utf-8')
     console.log(chalk.green('  Created .engram/config.json'))
   } else {
-    console.log(chalk.gray('  .engram/config.json already exists'))
+    // Update domain if config already exists
+    try {
+      const existing = JSON.parse(readFileSync(configPath, 'utf-8')) as Record<string, unknown>
+      existing['domain'] = domain
+      writeFileSync(configPath, JSON.stringify(existing, null, 2), 'utf-8')
+    } catch { /* ignore */ }
+    console.log(chalk.gray('  .engram/config.json already exists (domain updated)'))
   }
 
   // 3. Create .engram/hooks/ and copy hook scripts
   const hooksDestDir = join(engramDir, 'hooks')
   mkdirSync(hooksDestDir, { recursive: true })
 
-  const hookFiles = ['enforce.sh', 'snapshot.sh', 'heartbeat.sh']
+  const hookFiles = ['enforce.sh', 'snapshot.sh', 'heartbeat.sh', 'observer.sh']
   for (const hookFile of hookFiles) {
     const src = join(HOOKS_SOURCE_DIR, hookFile)
     const dest = join(hooksDestDir, hookFile)

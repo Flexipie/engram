@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import type { Request, Response } from 'express'
+import type { Request, Response, NextFunction } from 'express'
 import { createTestDb, createTestPool, teardownDb } from '../setup.js'
 import { createEnforceHandler, type EnforcementStats } from '../../http/enforce.js'
 import { handleCheckConventions } from '../../mcp/handlers/enforce.js'
@@ -36,14 +36,14 @@ describe('POST /enforce handler', () => {
   it('returns 400 when file_path is missing', () => {
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({})
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     expect(res.statusCode).toBe(400)
   })
 
   it('returns 200 with empty violations/warnings for unknown file', () => {
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     expect(res.statusCode).toBe(200)
     const body = res.body as { violations: string[]; warnings: string[] }
     expect(body.violations).toEqual([])
@@ -63,7 +63,7 @@ describe('POST /enforce handler', () => {
     )
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     expect(res.statusCode).toBe(200)
     const body = res.body as { violations: string[] }
     expect(body.violations).toContain('Never use eval()')
@@ -79,7 +79,7 @@ describe('POST /enforce handler', () => {
     })
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     const body = res.body as { violations: string[]; warnings: string[] }
     expect(body.warnings).toContain('Prefer named exports')
     expect(body.violations).not.toContain('Prefer named exports')
@@ -94,7 +94,7 @@ describe('POST /enforce handler', () => {
     })
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     // HTTP always 200 — exit code decision belongs to caller
     expect(res.statusCode).toBe(200)
   })
@@ -104,8 +104,8 @@ describe('POST /enforce handler', () => {
     const handler = createEnforceHandler(createTestPool(db), CONFIG, stats)
     const { req: r1, res: rs1 } = mockReqRes({ file_path: 'src/api/a.ts' })
     const { req: r2, res: rs2 } = mockReqRes({ file_path: 'src/api/b.ts' })
-    handler(r1, rs1 as unknown as Response)
-    handler(r2, rs2 as unknown as Response)
+    handler(r1, rs1 as unknown as Response, (() => {}) as unknown as NextFunction)
+    handler(r2, rs2 as unknown as Response, (() => {}) as unknown as NextFunction)
     expect(stats.checks).toBe(2)
   })
 
@@ -119,7 +119,7 @@ describe('POST /enforce handler', () => {
     const stats = makeStats()
     const handler = createEnforceHandler(createTestPool(db), CONFIG, stats)
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     expect(stats.violations).toBeGreaterThan(0)
   })
 
@@ -136,7 +136,7 @@ describe('POST /enforce handler', () => {
 
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     const body = res.body as { violations: string[] }
     expect(body.violations).not.toContain('Stale rule should not block')
   })
@@ -144,7 +144,7 @@ describe('POST /enforce handler', () => {
   it('returns scope and memories_checked in response', () => {
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     const body = res.body as { scope: string; memories_checked: number }
     expect(body.scope).toBe('api')
     expect(typeof body.memories_checked).toBe('number')
@@ -159,7 +159,7 @@ describe('POST /enforce handler', () => {
     })
     const handler = createEnforceHandler(createTestPool(db), CONFIG, makeStats())
     const { req, res } = mockReqRes({ file_path: 'src/api/handler.ts', scope: 'database' })
-    handler(req, res as unknown as Response)
+    handler(req, res as unknown as Response, (() => {}) as unknown as NextFunction)
     const body = res.body as { violations: string[]; scope: string }
     expect(body.scope).toBe('database')
     expect(body.violations).toContain('Use transactions')

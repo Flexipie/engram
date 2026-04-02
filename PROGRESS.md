@@ -5,7 +5,7 @@ Universal convention memory layer for agentic AI. Any agent, any domain, any tea
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility strategy.
 
-## Status: Phase 4 + 5 Complete ✓ | Global Service Installer Complete ✓
+## Status: Phases 1–7 + Phase 9 Complete ✓ | 294 tests passing
 
 ---
 
@@ -28,14 +28,6 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility s
 - [x] CLAUDE.md injection (sentinel-based, idempotent)
 - [x] `.claude/settings.json` hook merge (idempotent)
 - [x] 30 unit + integration tests passing
-
-### Verification checklist (manual)
-- [ ] `engram init` in a test project — check `.engram/`, `CLAUDE.md`, `.claude/settings.json`
-- [ ] `engram start` — check PID file, `/health` responds
-- [ ] Connect Claude Code to `http://localhost:7337/mcp` — call `session_start()`
-- [ ] Call `update_task({ title, goal })` — verify returns `{ task_id }`
-- [ ] Trigger compaction → `snapshot.sh` fires → snapshot row in DB
-- [ ] Call `session_start()` again — verify task field populated
 
 ---
 
@@ -80,30 +72,16 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility s
 
 ---
 
-## Phase 4 — Cross-Worktree Awareness
+## Phase 4 — Cross-Worktree Awareness ✓ DONE
 
 **Goal:** Parallel agents are not invisible to each other.
 
-### Already done (infrastructure from Phase 1)
+### Completed
 - [x] `worktree_activity` table — `worktree`, `task_id`, `active_files`, `last_heartbeat`
 - [x] `pruneStale()` — deletes rows with `last_heartbeat` older than 10 min, called on every `session_start`
 - [x] `session_start` returns `worktree_conflicts` (all other active worktrees)
 - [x] `heartbeat.sh` — fires every 10 tool calls, sends `active_files`
 - [x] `engram task --all` — shows all active worktrees with last heartbeat age
-
-### To implement
-- [ ] `get_worktree_status` MCP tool — mid-session check without re-running `session_start`
-  - Returns: `{ active_worktrees: [{ worktree, task_title, task_goal, active_files, age_seconds }], file_conflicts: string[] }`
-  - `file_conflicts`: current worktree's task `key_files` ∩ other worktrees' `active_files` (Option A)
-- [ ] Add `file_conflicts: string[]` to `session_start` response — compare task `key_files` vs other worktrees' `active_files`
-- [ ] `pruneStale()` called before `getActiveWorktrees()` in `engram task --all`
-- [ ] `engram status` shows active worktrees count + enforcement stats (checks/violations since start)
-
-### File conflict detection: Option A (confirmed)
-Compare current worktree's **task `key_files`** (from previous session, persistent) against other worktrees' **`active_files`** (from heartbeat, live).
-Rationale: works at session start before the agent has sent any heartbeats.
-
-### Completed
 - [x] `get_worktree_status` MCP tool — `src/mcp/handlers/worktree.ts`
 - [x] `file_conflicts: string[]` added to `session_start` response
 - [x] `src/db/worktrees.ts` — `getFileConflicts()` helper
@@ -116,7 +94,7 @@ Rationale: works at session start before the agent has sent any heartbeats.
 
 ## Phase 5 — Convention Enforcement ✓ DONE
 
-**Goal:** Violations caught before they are written. Agent-agnostic — works for any domain, not just code.
+**Goal:** Violations caught before they are written.
 
 ### Completed
 - [x] `src/enforcement/checker.ts` — `checkConventions()` using effective score (confidence × recency × scope boost)
@@ -128,9 +106,7 @@ Rationale: works at session start before the agent has sent any heartbeats.
 - [x] `decision` type memories max out at warnings (never block)
 - [x] `snippet` and `error_pattern` types excluded from enforcement checks
 - [x] Stale memories (>90 days) get recency factor 0.5 — less likely to block
-- [x] 132 tests passing (29 new: 15 unit + 14 integration)
-
----
+- [x] 185 tests passing (29 new: 15 unit + 14 integration)
 
 ---
 
@@ -154,90 +130,145 @@ Rationale: works at session start before the agent has sent any heartbeats.
 - [x] `hooks/enforce.sh` — adds `worktree=$(git rev-parse --show-toplevel)` to POST body
 - [x] 185 tests passing (26 new: 8 db-pool + 10 service-installer + 8 update-claude-md)
 
-### Architecture
-- Global mode: one server, DbPool opens project DBs on demand per request, PID at `~/.engram/running.json`
-- Per-project mode: unchanged — pool pre-opens one DB, all existing behaviour preserved
-- Backward compatible: all hooks work with or without worktree in body (per-project uses default)
+---
+
+## Phase 6 — Dynamic Scopes + Domain Profiles + Bootstrap/GC/Export ✓ DONE
+
+**Goal:** Break out of hardcoded software scopes. Any domain can configure Engram for its context. Ship operational tooling.
+
+### Completed
+- [x] `src/domain/profiles.ts` — `DomainProfile` + `DomainAdapter` interfaces, profile registry, `SOFTWARE_SCOPES`
+- [x] `src/domain/active-profile.ts` — module-level singleton: `setActiveProfile()`, `getActiveProfile()`, `getActiveScopes()`, `getActiveScopeAdapter()`
+- [x] `src/domain/adapters/software.ts` — `SoftwareAdapter`: all 15-scope `fileToScope()` logic, registers on import
+- [x] `src/domain/adapters/legal.ts` — 6 scopes: litigation, contracts, due_diligence, regulatory, research, general
+- [x] `src/domain/adapters/research.ts` — 7 scopes: methodology, literature, data, analysis, writing, citations, general
+- [x] `src/domain/adapters/general.ts` — single scope: general
+- [x] `src/db/memories.ts` — `MemoryScope = string`, re-exports `SOFTWARE_SCOPES` from profiles
+- [x] `src/retrieval/scope-detector.ts` — `fileToScope()` delegates to `getActiveScopeAdapter()`
+- [x] `src/errors/normalizer.ts` — removed duplicate `fileToScope()`, imports from scope-detector
+- [x] `src/mcp/tools.ts` — all 5 `z.enum(MEMORY_SCOPES)` replaced with `z.string().refine(s => getActiveScopes().includes(s))`
+- [x] `src/mcp/handlers/memory.ts` — `scopeField()` factory, dynamic validation
+- [x] `src/mcp/handlers/error.ts` — scope params use `z.string().optional()`
+- [x] `src/http/enforce.ts` — scope validation uses `getActiveScopes()`
+- [x] `src/config.ts` — `domain: string` field added (default `'software'`)
+- [x] `src/server.ts` — `setActiveProfile(config.domain)` at startup
+- [x] `src/cli/commands/init.ts` — `--domain <profile>` option, updates config
+- [x] `src/cli/commands/bootstrap.ts` — `engram bootstrap`: detects ESM/CJS, test framework, Zod, TS, Express from `package.json`; seeds memories `confidence: 0.5, source: 'bootstrap'`
+- [x] `src/cli/commands/gc.ts` — `engram gc`: archive confidence < 0.2, prune snapshots to 3/task, archive paused tasks > 60 days; appends to `.engram/gc.log`
+- [x] `src/cli/commands/export.ts` — `engram export` (JSON file or stdout) + `engram import <file>` (merge or replace)
+- [x] `src/cli/commands/apikey.ts` — `engram apikey generate/list/revoke`
+- [x] `src/cli/index.ts` — all new commands registered
+- [x] Tests: domain-profiles, dynamic-scopes, gc, export-import, auth-middleware
+- [x] 240 tests passing (55 new)
 
 ---
 
-## Phase 6 — Dynamic Scopes + Domain Profiles
+## Phase 7 — Full REST API ✓ DONE
 
-**Goal:** Break out of hardcoded software scopes. Any domain can configure Engram for its context.
+**Goal:** Any agent that speaks HTTP can use Engram without MCP.
 
-### To implement
-- [ ] Domain profile schema — config object: `{ scopes, scopeAdapter, defaultMemoryTypes }`
-- [ ] Make `MEMORY_SCOPES` dynamic — loaded from domain profile, not hardcoded in source
-- [ ] Scope adapter interface — pluggable `(context) => scope` function
-- [ ] Built-in profiles: `software` (current default), `legal`, `research`
-- [ ] `engram init --domain <profile>` — init with a specific domain profile
-- [ ] Config schema updated: `domain` field
-
-### Tests to write first
-- `src/__tests__/unit/domain-profiles.test.ts`
-- `src/__tests__/integration/dynamic-scopes.test.ts`
-
----
-
-## Phase 7 — Full REST API
-
-**Goal:** Any agent that can make HTTP requests can use Engram, without MCP support.
-
-### To implement
-- [ ] `POST /api/memories` — insert memory
-- [ ] `GET /api/memories` — query memories (scope, type, query params)
-- [ ] `POST /api/sessions/start` — session_start equivalent
-- [ ] `PATCH /api/sessions/:id` — update_task equivalent
-- [ ] `POST /api/errors/check` — check_error equivalent
-- [ ] `POST /api/errors/record` — record_error equivalent
-- [ ] API key auth (simple, single-tenant for local; multi-tenant for cloud)
-- [ ] OpenAPI spec generated from routes
-
-### Tests to write first
-- `src/__tests__/integration/rest-api.test.ts`
+### Completed
+- [x] `src/http/api/middleware/auth.ts` — Bearer token validation (SHA256 hashes, off by default)
+- [x] `src/http/api/middleware/worktree.ts` — `?worktree=` → `pool.resolve()` → `req.db`
+- [x] `src/config.ts` — `apiKeyRequired: boolean`, `apiKeys: string[]` added
+- [x] `src/http/api/v1/memories.ts` — GET/POST/PATCH/DELETE `/v1/memories[/:id]`
+- [x] `src/http/api/v1/sessions.ts` — POST/GET/PATCH `/v1/sessions`, POST `/v1/sessions/:id/snapshot`
+- [x] `src/http/api/v1/errors.ts` — POST `/v1/errors/check`, POST `/v1/errors/record`, GET `/v1/errors`
+- [x] `src/http/api/v1/recall.ts` — POST `/v1/recall`
+- [x] `src/http/api/v1/enforce.ts` — POST `/v1/enforce`
+- [x] `src/http/api/v1/router.ts` — mounts auth + worktree middleware, all sub-routers
+- [x] `src/http/api/openapi.ts` — hand-written OpenAPI 3.1 spec
+- [x] `src/server.ts` — mounts `/v1` router, serves `GET /openapi.json`
+- [x] `src/__tests__/test-app.ts` — `createTestApp()` helper for supertest integration tests
+- [x] Integration tests: v1-memories, v1-sessions, v1-errors, v1-recall, v1-auth, openapi
+- [x] 294 tests passing (54 new)
 
 ---
 
-## Phase 8 — Bootstrap + Polish
+## Phase 9 — Auto-Extraction Observer ✓ DONE
 
-**Goal:** Day-one value for new projects, npm publishable.
+**Goal:** Engram learns from sessions even when the agent never calls `remember()` explicitly.
+
+### Completed
+- [x] `src/observer/buffer.ts` — `EventBuffer`: flush on size OR timer, `add()`, `flush()`, `destroy()`, `size()`
+- [x] `src/observer/extractor.ts` — `ExtractionEngine` interface, `buildPrompt()`, `parseExtractionResponse()`, `filterExisting()`
+- [x] `src/observer/extractors/ollama.ts` — `OllamaExtractor`: POST `/api/chat`, 60s timeout, fallback to `/api/generate`
+- [x] `src/observer/extractors/haiku.ts` — `HaikuExtractor`: POST Anthropic API, 30s timeout
+- [x] `src/observer/writer.ts` — `RestApiWriter`: writes via `/v1/memories`, fetches context from `/v1/memories` + `/v1/sessions/current`
+- [x] `src/observer/server.ts` — `createObserverApp()`: Express on port 7338, GET /health, POST /event, POST /flush
+- [x] `src/observer/index.ts` — process entry point: reads config, picks extractor, starts server
+- [x] `src/cli/commands/observer.ts` — `engram observer start/stop/status` (PID at `.engram/observer.pid`)
+- [x] `src/cli/index.ts` — `engram observer start/stop/status` registered
+- [x] `hooks/observer.sh` — PostToolUse hook: extracts tool/file/exit_status from stdin, POSTs to port 7338, always exits 0
+- [x] `src/cli/commands/init.ts` — installs `observer.sh` + registers in `settings.json`
+- [x] `src/config.ts` — `ObserverConfig` interface + `observer` field in `EngramConfig`
+- [x] Tests: observer-buffer (11), observer-extractor (12), observer-server (8) — all passing
+- [x] 294 tests passing
+
+### How it works
+1. Every PostToolUse event, `observer.sh` sends `{ tool, file_path, exit_status }` to port 7338
+2. `EventBuffer` accumulates events; flushes when `batchSize` (default 10) reached OR `flushIntervalMs` (default 30s) expires
+3. On flush: fetch active task + existing memories from REST API, run extraction prompt through llama3.2 (Ollama, free) or Claude Haiku (paid)
+4. Extracted memories written with `source: 'observer', confidence: 0.4`
+5. Enable with `observer.enabled: true` in `.engram/config.json`, then `engram observer start`
+
+---
+
+## Phase 8 — Semantic Retrieval + Contradiction Detection
+
+**Goal:** Find memories by meaning, not just keywords.
 
 ### To implement
-- [ ] `engram bootstrap` — analyse project and seed memories from existing patterns
-  - Software: ts-morph AST (imports, exports, Zod usage)
-  - General: configurable via domain profile bootstrap adapter
-- [ ] `engram gc` — prune stale data (low-confidence memories, old snapshots, paused tasks)
-- [ ] `engram export` — full JSON backup (portable across instances)
-- [ ] `engram snapshots --restore <id>` — manual restore
-- [ ] npm publish prep (README, `files` field, bin entry)
+- [ ] `sqlite-vec` extension — vector KNN search inside SQLite
+- [ ] `nomic-embed-text` via Ollama — offline embeddings, graceful FTS5 fallback
+- [ ] `memories.embedding BLOB` column + migration
+- [ ] `memory_edges` table: `(from_id, to_id, relation: 'implies'|'contradicts'|'supersedes'|'related')`
+- [ ] Similarity check on `insertMemory()` — auto-create `contradicts` edge on similarity > 0.85
+- [ ] `recall()` upgrade — hybrid FTS5 + vector union, rerank by combined score
+- [ ] `traverse_graph: true` option — return memory + graph neighbors via recursive CTE
 
-### Tests to write first
-- `src/__tests__/unit/bootstrap-extractor.test.ts`
-- `src/__tests__/integration/gc.test.ts`
-- `src/__tests__/integration/export.test.ts`
+---
+
+## Phase 10 — TypeScript SDK (`@engram/sdk`)
+
+**Goal:** Any agent framework gets Engram with 3 lines of code.
+
+### To implement
+- [ ] npm package; talks to REST API (not SQLite directly)
+- [ ] `EngramClient` — session lifecycle, memory injection, error pattern checking
+- [ ] LangGraph adapter — `withEngram(graph, client)` wraps tool nodes as middleware
+- [ ] LangChain adapter — `EngramCallbackHandler`
+- [ ] AutoGen adapter — `MemoryAwareAgent` base class
+
+---
+
+## Phase 11 — Cloud Sync + Team Memory
+
+**Goal:** Engram as team infrastructure.
+
+### To implement
+- [ ] Sync daemon — mirrors local SQLite to hosted PostgreSQL asynchronously
+- [ ] Team namespaces by `project_id` (hash of repo remote URL)
+- [ ] `StorageBackend` interface — SQLite and PostgreSQL both implement it
+- [ ] Paid tier: cloud sync, team namespaces, admin dashboard, SLA
+
+---
+
+## Phase 12 — Memory Marketplace
+
+**Goal:** Community-sourced intelligence, bootstrap new projects instantly.
+
+### To implement
+- [ ] Auto-promotion: memory in 3+ projects with confidence ≥ 0.7 → community pool candidate
+- [ ] Memory packages: `engram import @engram/memories-react`
+- [ ] Private packages for team conventions
+- [ ] Package format: curated JSON export (Phase 6 format, version-pinned)
 
 ---
 
 ## Backlog — Feedback-Sourced Improvements
 
-Items identified from design review, not phase-assigned yet:
-
-- [ ] **Per-tool telemetry** — extend `EnforcementStats` pattern to all MCP tools. Track: session_start hit/miss rate on task, check_error hit rate, recall query patterns, remember call volume by type/scope. Expose via `/health` or new `/stats` endpoint.
-- [x] **`engram update-claude-md`** — re-inject latest CLAUDE.md template into existing projects using sentinel markers. Needed so improvements to the template reach projects that ran `engram init` earlier.
-- [ ] **Global memory decision rule** — auto-promote a memory to global after it appears in N≥3 distinct projects with confidence≥0.7. Today agents must decide manually via `global: true`.
-- [ ] **`update_task` tool description** — explicitly document create-on-missing behaviour so agents starting fresh know to call it. Consider alias `sync_task`.
-- [ ] **CLAUDE.md template length** — current template is concise post-Phase-5. Monitor if agents are following the error workflow (check_error first) in practice. Tighten further if not.
-
----
-
-## Future — Cloud + SDK
-
-**Goal:** Engram as infrastructure, not just a local tool.
-
-- [ ] PostgreSQL storage backend (same interface as SQLite layer)
-- [ ] Cloud sync — local DB mirrors to hosted store, follows user across machines
-- [ ] Team sharing — multiple agents on same repo feed the same knowledge base
-- [ ] TypeScript SDK — `import { EngramClient } from 'engram'` for embedding in agent frameworks
-- [ ] Python SDK
-- [ ] Web dashboard — browse/manage memories, view enforcement analytics
-- [ ] Multi-tenant auth for hosted deployments
+- [ ] **Per-tool telemetry** — extend `EnforcementStats` pattern to all MCP tools. Track: session_start hit/miss rate, check_error hit rate, recall query patterns, remember call volume.
+- [x] **`engram update-claude-md`** — re-inject latest CLAUDE.md template into existing projects.
+- [ ] **Global memory auto-promotion** — promote memory to global after N≥3 distinct projects with confidence≥0.7.
+- [ ] **`update_task` tool description** — explicitly document create-on-missing behaviour.

@@ -63,7 +63,7 @@ export async function buildContextPacket(
   if (includeGlobal && globalDb) {
     const globalRaw = queryGlobalMemories(globalDb, { excludeInvalidated: true })
     const globalRanked = rankMemories(globalRaw as Memory[], detectedScopes)
-    global = globalRanked.slice(0, 5) as GlobalMemory[]
+    global = globalRanked.slice(0, 5) as unknown as GlobalMemory[]
   }
 
   return {

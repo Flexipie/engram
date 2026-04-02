@@ -10,6 +10,11 @@ import { runInvalidate } from './commands/invalidate.js'
 import { runErrors } from './commands/errors.js'
 import { runServiceInstall, runServiceUninstall, runServiceStatus } from './commands/service.js'
 import { runUpdateClaudeMd } from './commands/update-claude-md.js'
+import { runBootstrapCommand } from './commands/bootstrap.js'
+import { runGcCommand } from './commands/gc.js'
+import { runExportCommand, runImportCommand } from './commands/export.js'
+import { runApiKeyGenerate, runApiKeyList, runApiKeyRevoke } from './commands/apikey.js'
+import { runObserverStart, runObserverStop, runObserverStatus } from './commands/observer.js'
 
 const program = new Command()
 
@@ -21,8 +26,9 @@ program
 program
   .command('init')
   .description('Initialise .engram/ in current project and configure Claude Code hooks')
-  .action(async () => {
-    await runInit()
+  .option('--domain <profile>', 'Domain profile (software, legal, research, general)', 'software')
+  .action(async (options: { domain?: string }) => {
+    await runInit(process.cwd(), options.domain ?? 'software')
   })
 
 program
@@ -111,6 +117,87 @@ program
   .description('Re-inject the latest Engram snippet into CLAUDE.md (idempotent)')
   .action(async () => {
     await runUpdateClaudeMd()
+  })
+
+program
+  .command('bootstrap')
+  .description('Analyse codebase and seed memories from existing patterns')
+  .action(async () => {
+    await runBootstrapCommand()
+  })
+
+program
+  .command('gc')
+  .description('Garbage collect low-confidence memories and prune old snapshots')
+  .action(async () => {
+    await runGcCommand()
+  })
+
+program
+  .command('export')
+  .description('Export memories to a JSON file')
+  .option('--output <path>', 'Output file path')
+  .option('--json', 'Print to stdout instead of writing a file')
+  .action(async (options: { output?: string; json?: boolean }) => {
+    await runExportCommand(process.cwd(), options)
+  })
+
+program
+  .command('import <file>')
+  .description('Import memories from an export file')
+  .option('--replace', 'Wipe existing memories before importing')
+  .action(async (file: string, options: { replace?: boolean }) => {
+    await runImportCommand(file, process.cwd(), options)
+  })
+
+const apikeyCmd = program
+  .command('apikey')
+  .description('Manage REST API keys')
+
+apikeyCmd
+  .command('generate')
+  .description('Generate a new API key (shown once)')
+  .action(() => {
+    runApiKeyGenerate()
+  })
+
+apikeyCmd
+  .command('list')
+  .description('List stored API key hashes')
+  .action(() => {
+    runApiKeyList()
+  })
+
+apikeyCmd
+  .command('revoke <hash>')
+  .description('Revoke an API key by its SHA256 hash')
+  .action((hash: string) => {
+    runApiKeyRevoke(hash)
+  })
+
+const observerCmd = program
+  .command('observer')
+  .description('Manage the Engram observer sidecar (auto-extraction from tool events)')
+
+observerCmd
+  .command('start')
+  .description('Start the observer sidecar in the background')
+  .action(async () => {
+    await runObserverStart(process.cwd())
+  })
+
+observerCmd
+  .command('stop')
+  .description('Stop the running observer sidecar')
+  .action(async () => {
+    await runObserverStop(process.cwd())
+  })
+
+observerCmd
+  .command('status')
+  .description('Show observer status and buffer info')
+  .action(async () => {
+    await runObserverStatus(process.cwd())
   })
 
 program.parseAsync(process.argv).catch((err: unknown) => {

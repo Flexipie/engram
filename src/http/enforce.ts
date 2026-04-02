@@ -1,6 +1,6 @@
 import type { RequestHandler } from 'express'
 import { checkConventions, type EnforcementConfig } from '../enforcement/checker.js'
-import { MEMORY_SCOPES, type MemoryScope } from '../db/memories.js'
+import { getActiveScopes } from '../domain/active-profile.js'
 import { logger } from '../logger.js'
 import { DbPool } from '../db/pool.js'
 
@@ -27,8 +27,8 @@ export function createEnforceHandler(
       return
     }
 
-    const scopeOverride = scope && (MEMORY_SCOPES as readonly string[]).includes(scope)
-      ? (scope as MemoryScope)
+    const scopeOverride = scope && getActiveScopes().includes(scope)
+      ? scope
       : undefined
 
     let db

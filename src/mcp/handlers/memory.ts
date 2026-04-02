@@ -4,22 +4,27 @@ import {
   insertMemory,
   invalidateMemory as dbInvalidateMemory,
   MEMORY_TYPES,
-  MEMORY_SCOPES,
 } from '../../db/memories.js'
+import { getActiveScopes } from '../../domain/active-profile.js'
 import { insertGlobalMemory } from '../../db/global.js'
 import { buildContextPacket, type ContextPacket } from '../../retrieval/context-packet.js'
 import { detectScopes } from '../../retrieval/scope-detector.js'
 
+const scopeField = () => z.string().refine(
+  s => getActiveScopes().includes(s),
+  s => ({ message: `Invalid scope "${s}". Valid: ${getActiveScopes().join(', ')}` }),
+)
+
 const RememberSchema = z.object({
   content: z.string().describe('The knowledge to store'),
   type: z.enum(MEMORY_TYPES),
-  scope: z.enum(MEMORY_SCOPES),
+  scope: scopeField(),
   source: z.enum(['agent', 'manual']).optional().default('agent'),
   global: z.boolean().optional().default(false),
 })
 
 const RecallSchema = z.object({
-  scopes: z.array(z.enum(MEMORY_SCOPES)).optional(),
+  scopes: z.array(scopeField()).optional(),
   types: z.array(z.enum(MEMORY_TYPES)).optional(),
   query: z.string().optional(),
   include_global: z.boolean().optional().default(false),

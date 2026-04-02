@@ -1,21 +1,6 @@
 import { createHash } from 'crypto'
 import type { MemoryScope } from '../db/memories.js'
-
-// Re-implement fileToScope locally — scope-detector.ts has the same logic
-// but it's not exported and has async git dependencies we don't need here.
-function fileToScope(filePath: string): string {
-  if (/\.(test|spec)\.[a-z]+$/.test(filePath)) return 'testing'
-  if (/__tests__\//.test(filePath)) return 'testing'
-  if (/^src\/auth\//.test(filePath)) return 'auth'
-  if (/^src\/api\//.test(filePath)) return 'api'
-  if (/^src\/components\//.test(filePath)) return 'components'
-  if (/^src\/ui\//.test(filePath)) return 'components'
-  if (/^src\/db\//.test(filePath)) return 'database'
-  if (/src\/[^/]*db[^/]*\//.test(filePath)) return 'database'
-  if (/^src\/config\//.test(filePath)) return 'config'
-  if (/\.config\.[a-z]+$/.test(filePath)) return 'config'
-  return 'general'
-}
+import { fileToScope } from '../retrieval/scope-detector.js'
 
 export function normalizeError(raw: string): string {
   return raw

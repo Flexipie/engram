@@ -13,10 +13,20 @@ import { createHeartbeatHandler } from './http/heartbeat.js'
 import { createSnapshotHandler } from './http/snapshot.js'
 import { createEnforceHandler, type EnforcementStats } from './http/enforce.js'
 import { DbPool } from './db/pool.js'
+import { setActiveProfile } from './domain/active-profile.js'
+import { createV1Router } from './http/api/v1/router.js'
+import { openApiSpec } from './http/api/openapi.js'
 
 const isGlobal = process.env.ENGRAM_GLOBAL === 'true'
 const projectDir = isGlobal ? null : (process.env.ENGRAM_PROJECT_DIR ?? process.cwd())
 const config = loadConfig(projectDir ?? undefined)
+
+// Activate domain profile from config
+try {
+  setActiveProfile(config.domain)
+} catch {
+  logger.warn(`Unknown domain profile "${config.domain}", falling back to "software"`)
+}
 const port = Number(process.env.ENGRAM_PORT ?? config.port)
 
 // DB pool: global mode has no default (resolved per request); project mode pre-opens the project DB
@@ -56,6 +66,12 @@ app.post('/snapshot', createSnapshotHandler(pool))
 
 // Convention enforcement endpoint
 app.post('/enforce', createEnforceHandler(pool, config, enforcementStats))
+
+// REST API v1
+app.use('/v1', createV1Router(pool, globalDb, config))
+
+// OpenAPI spec
+app.get('/openapi.json', (_req, res) => res.json(openApiSpec))
 
 // MCP streamable HTTP transport
 app.post('/mcp', async (req, res) => {

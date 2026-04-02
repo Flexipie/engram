@@ -5,7 +5,8 @@ import { handleRemember, handleRecall, handleInvalidate } from './handlers/memor
 import { handleCheckError, handleRecordError } from './handlers/error.js'
 import { handleCheckConventions } from './handlers/enforce.js'
 import { handleGetWorktreeStatus } from './handlers/worktree.js'
-import { MEMORY_TYPES, MEMORY_SCOPES } from '../db/memories.js'
+import { MEMORY_TYPES } from '../db/memories.js'
+import { getActiveScopes } from '../domain/active-profile.js'
 import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
 import { DbPool } from '../db/pool.js'
@@ -89,7 +90,10 @@ export function setupTools(
         .describe('Absolute path to worktree (defaults to cwd)'),
       content: z.string().describe('The knowledge to store'),
       type: z.enum(MEMORY_TYPES).describe('Category of knowledge'),
-      scope: z.enum(MEMORY_SCOPES).describe('Area of the codebase this applies to'),
+      scope: z.string().refine(
+        s => getActiveScopes().includes(s),
+        s => ({ message: `Invalid scope "${s}". Valid: ${getActiveScopes().slice(0, 10).join(', ')}${getActiveScopes().length > 10 ? '...' : ''}` }),
+      ).describe('Area this applies to'),
       source: z.enum(['agent', 'manual']).optional().describe('Who created this memory'),
       global: z.boolean().optional().describe('Store in global DB (cross-project)'),
     },
@@ -114,7 +118,10 @@ export function setupTools(
         .optional()
         .describe('Absolute path to worktree (defaults to cwd)'),
       scopes: z
-        .array(z.enum(MEMORY_SCOPES))
+        .array(z.string().refine(
+          s => getActiveScopes().includes(s),
+          s => ({ message: `Invalid scope "${s}"` }),
+        ))
         .optional()
         .describe('Filter by scope(s)'),
       types: z
@@ -152,7 +159,10 @@ export function setupTools(
         .optional()
         .describe('Absolute path to worktree (defaults to cwd)'),
       error_raw: z.string().describe('The full error output'),
-      scope: z.enum(MEMORY_SCOPES).optional().describe('Scope hint (auto-detected if omitted)'),
+      scope: z.string().refine(
+        s => getActiveScopes().includes(s),
+        s => ({ message: `Invalid scope "${s}"` }),
+      ).optional().describe('Scope hint (auto-detected if omitted)'),
     },
     async (params) => {
       try {
@@ -177,7 +187,10 @@ export function setupTools(
       error_raw: z.string().describe('The full error output'),
       cause: z.string().optional().describe('What caused the error'),
       fix: z.string().optional().describe('What resolved it'),
-      scope: z.enum(MEMORY_SCOPES).optional().describe('Scope (auto-detected if omitted)'),
+      scope: z.string().refine(
+        s => getActiveScopes().includes(s),
+        s => ({ message: `Invalid scope "${s}"` }),
+      ).optional().describe('Scope (auto-detected if omitted)'),
     },
     async (params) => {
       try {
@@ -242,7 +255,10 @@ export function setupTools(
         .describe('Absolute path to worktree (defaults to cwd)'),
       file_path: z.string().describe('Path of the file about to be written'),
       content: z.string().optional().describe('File content (reserved — not used in Phase 5)'),
-      scope: z.enum(MEMORY_SCOPES).optional().describe('Scope override (auto-detected from path if omitted)'),
+      scope: z.string().refine(
+        s => getActiveScopes().includes(s),
+        s => ({ message: `Invalid scope "${s}"` }),
+      ).optional().describe('Scope override (auto-detected from path if omitted)'),
     },
     async (params) => {
       try {

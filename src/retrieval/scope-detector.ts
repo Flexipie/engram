@@ -1,57 +1,9 @@
 import { execa } from 'execa'
-import type { MemoryScope } from '../db/memories.js'
+import { getActiveScopeAdapter } from '../domain/active-profile.js'
 
-export function fileToScope(filePath: string): MemoryScope {
-  const f = filePath
-
-  // Testing patterns (check first — test files in any dir)
-  if (/\.(test|spec)\.[a-z]+$/.test(f)) return 'testing'
-  if (/__tests__\//.test(f)) return 'testing'
-
-  // Auth
-  if (/^src\/auth\//.test(f)) return 'auth'
-
-  // API
-  if (/^src\/api\//.test(f)) return 'api'
-
-  // Components / UI
-  if (/^src\/components\//.test(f)) return 'components'
-  if (/^src\/ui\//.test(f)) return 'components'
-
-  // Database
-  if (/^src\/db\//.test(f)) return 'database'
-  if (/src\/[^/]*db[^/]*\//.test(f)) return 'database'
-
-  // Utils
-  if (/^src\/utils\//.test(f) || /\/utils\//.test(f)) return 'utils'
-
-  // Services
-  if (/^src\/services\//.test(f)) return 'services'
-
-  // Types
-  if (/^src\/types\//.test(f) || /\.types\.[a-z]+$/.test(f)) return 'types'
-
-  // State / store
-  if (/^src\/state\//.test(f) || /\/store\//.test(f)) return 'state'
-
-  // Routing
-  if (/^src\/routing\//.test(f) || /\/routes\//.test(f)) return 'routing'
-
-  // Infrastructure
-  if (/^src\/infra\//.test(f) || /\/infrastructure\//.test(f)) return 'infra'
-
-  // Scripts
-  if (/^scripts\//.test(f)) return 'scripts'
-
-  // Build tooling (specific tool names take priority over generic config)
-  if (/(?:webpack|rollup|tsup|babel|eslint|prettier)\.config/.test(f)) return 'build'
-  if (/^(Makefile|Dockerfile|\.github\/)/.test(f)) return 'build'
-
-  // Config (generic)
-  if (/^src\/config\//.test(f)) return 'config'
-  if (/\.config\.[a-z]+$/.test(f)) return 'config'
-
-  return 'general'
+export function fileToScope(filePath: string): string {
+  const result = getActiveScopeAdapter().fileToScope(filePath)
+  return result ?? 'general'
 }
 
 function parseGitStatus(output: string): string[] {

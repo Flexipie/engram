@@ -1,19 +1,19 @@
 import Database from 'better-sqlite3'
 import { z } from 'zod'
-import { MEMORY_SCOPES, type MemoryScope } from '../../db/memories.js'
+import type { MemoryScope } from '../../db/memories.js'
 import { lookupBySignature, upsertErrorPattern, incrementRecurrence } from '../../db/errors.js'
 import { computeSignature, normalizeError, scopeFromError } from '../../errors/normalizer.js'
 
 const CheckErrorSchema = z.object({
   error_raw: z.string().describe('The full error output'),
-  scope: z.enum(MEMORY_SCOPES).optional().describe('Scope hint (auto-detected if omitted)'),
+  scope: z.string().optional().describe('Scope hint (auto-detected if omitted)'),
 })
 
 const RecordErrorSchema = z.object({
   error_raw: z.string().describe('The full error output'),
   cause: z.string().optional().describe('What caused the error'),
   fix: z.string().optional().describe('What resolved it'),
-  scope: z.enum(MEMORY_SCOPES).optional().describe('Scope (auto-detected if omitted)'),
+  scope: z.string().optional().describe('Scope (auto-detected if omitted)'),
 })
 
 type CheckErrorParams = z.infer<typeof CheckErrorSchema>

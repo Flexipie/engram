@@ -1,19 +1,19 @@
 import Database from 'better-sqlite3'
 import { v4 as uuidv4 } from 'uuid'
+import { SOFTWARE_SCOPES } from '../domain/profiles.js'
 
 export const MEMORY_TYPES = ['convention', 'decision', 'anti_pattern', 'snippet', 'error_pattern'] as const
 export type MemoryType = typeof MEMORY_TYPES[number]
 
-export const MEMORY_SCOPES = [
-  'auth', 'api', 'components', 'database', 'testing', 'config', 'general',
-  'build', 'types', 'utils', 'services', 'state', 'routing', 'infra', 'scripts',
-] as const
-export type MemoryScope = typeof MEMORY_SCOPES[number]
+// MEMORY_SCOPES re-exports the software scopes for backward compatibility.
+// Use getActiveScopes() from domain/active-profile.ts for runtime validation.
+export const MEMORY_SCOPES = SOFTWARE_SCOPES
+export type MemoryScope = string
 
 export interface Memory {
   id: string
   type: MemoryType
-  scope: MemoryScope
+  scope: string
   content: string
   confidence: number
   source: string
@@ -33,7 +33,7 @@ export interface GlobalMemory extends Memory {
 
 export interface InsertMemoryData {
   type: MemoryType
-  scope: MemoryScope
+  scope: string
   content: string
   confidence?: number
   source?: string

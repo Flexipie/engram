@@ -2,6 +2,17 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 
+export interface ObserverConfig {
+  enabled: boolean
+  model: 'ollama' | 'haiku'
+  ollamaUrl: string
+  ollamaModel: string
+  haikuApiKey?: string
+  batchSize: number
+  flushIntervalMs: number
+  port: number
+}
+
 export interface EngramConfig {
   port: number
   maxMemories: number
@@ -10,6 +21,20 @@ export interface EngramConfig {
   blockThreshold: number
   alwaysIncludeGlobal: boolean
   minRecallConfidence: number
+  domain: string
+  apiKeyRequired: boolean
+  apiKeys: string[]
+  observer: ObserverConfig
+}
+
+const OBSERVER_DEFAULTS: ObserverConfig = {
+  enabled: false,
+  model: 'ollama',
+  ollamaUrl: 'http://localhost:11434',
+  ollamaModel: 'llama3.2',
+  batchSize: 10,
+  flushIntervalMs: 30000,
+  port: 7338,
 }
 
 const DEFAULTS: EngramConfig = {
@@ -20,6 +45,10 @@ const DEFAULTS: EngramConfig = {
   blockThreshold: 0.8,
   alwaysIncludeGlobal: false,
   minRecallConfidence: 0.4,
+  domain: 'software',
+  apiKeyRequired: false,
+  apiKeys: [],
+  observer: OBSERVER_DEFAULTS,
 }
 
 function readJsonFile(filePath: string): Partial<EngramConfig> {
