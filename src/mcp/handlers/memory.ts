@@ -3,12 +3,16 @@ import { z } from 'zod'
 import {
   insertMemory,
   invalidateMemory as dbInvalidateMemory,
+  queryMemoriesWithEmbeddings,
+  updateMemoryEmbedding,
   MEMORY_TYPES,
 } from '../../db/memories.js'
 import { getActiveScopes } from '../../domain/active-profile.js'
 import { insertGlobalMemory } from '../../db/global.js'
 import { buildContextPacket, type ContextPacket } from '../../retrieval/context-packet.js'
 import { detectScopes } from '../../retrieval/scope-detector.js'
+import type { EmbeddingService } from '../../retrieval/embeddings.js'
+import { cosine, deserializeEmbedding, serializeEmbedding } from '../../retrieval/embeddings.js'
 
 const scopeField = () => z.string().refine(
   s => getActiveScopes().includes(s),
@@ -36,11 +40,24 @@ const InvalidateSchema = z.object({
   reason: z.string().optional(),
 })
 
+export interface ContradictionWarning {
+  id: string
+  content: string
+  similarity: number
+}
+
+export interface RememberResult {
+  id: string
+  contradicts_with?: ContradictionWarning[]
+}
+
 export async function handleRemember(
   db: Database.Database,
   globalDb: Database.Database | null,
   params: unknown,
-): Promise<{ id: string }> {
+  embeddingService?: EmbeddingService,
+  contradictionThreshold = 0.85,
+): Promise<RememberResult> {
   const data = RememberSchema.parse(params)
   const confidence = data.source === 'manual' ? 0.8 : 0.5
 
@@ -65,6 +82,29 @@ export async function handleRemember(
     confidence,
     source: data.source,
   })
+
+  // Embedding: generate + store, then check for contradictions
+  if (embeddingService?.available()) {
+    const embedding = await embeddingService.embed(data.content)
+    if (embedding) {
+      updateMemoryEmbedding(db, id, serializeEmbedding(embedding))
+
+      // Contradiction detection: compare against existing memories
+      const existing = queryMemoriesWithEmbeddings(db, { excludeInvalidated: true })
+      const contradictions: ContradictionWarning[] = []
+      for (const m of existing) {
+        if (m.id === id || !m.embedding) continue
+        const sim = cosine(embedding, deserializeEmbedding(m.embedding))
+        if (sim >= contradictionThreshold) {
+          contradictions.push({ id: m.id, content: m.content, similarity: sim })
+        }
+      }
+      if (contradictions.length > 0) {
+        return { id, contradicts_with: contradictions }
+      }
+    }
+  }
+
   return { id }
 }
 
@@ -72,6 +112,7 @@ export async function handleRecall(
   db: Database.Database,
   globalDb: Database.Database | null,
   params: unknown,
+  embeddingService?: EmbeddingService,
 ): Promise<ContextPacket> {
   const data = RecallSchema.parse(params)
   const detectedScopes = await detectScopes(process.cwd())
@@ -84,6 +125,7 @@ export async function handleRecall(
     includeGlobal: data.include_global,
     limit: data.limit,
     globalDb: globalDb ?? undefined,
+    embeddingService,
   })
 }
 

@@ -1,7 +1,8 @@
 import Database from 'better-sqlite3'
-import { queryMemories, type Memory, type GlobalMemory } from '../db/memories.js'
-import { rankMemories } from './ranker.js'
+import { queryMemories, queryMemoriesWithEmbeddings, type Memory, type GlobalMemory } from '../db/memories.js'
+import { rankMemories, rankWithEmbeddings } from './ranker.js'
 import { queryGlobalMemories } from '../db/global.js'
+import type { EmbeddingService } from './embeddings.js'
 
 export interface ContextPacket {
   critical: Memory[]
@@ -22,21 +23,31 @@ export async function buildContextPacket(
     includeGlobal?: boolean
     limit?: number
     globalDb?: Database.Database
+    embeddingService?: EmbeddingService
   },
 ): Promise<ContextPacket> {
-  const { detectedScopes, scopes, types, query, includeGlobal = false, limit = 15, globalDb } = opts
-
-  // Query all non-invalidated memories with optional filters
-  const allMemories = queryMemories(db, { scopes, types, query, excludeInvalidated: true })
+  const { detectedScopes, scopes, types, query, includeGlobal = false, limit = 15, globalDb, embeddingService } = opts
 
   // scopes_available: all unique scopes from all non-invalidated memories (not filtered)
   const allForScopes = queryMemories(db, { excludeInvalidated: true })
   const scopes_available = [...new Set(allForScopes.map((m) => m.scope))]
 
-  const total_count = allMemories.length
+  // Use hybrid reranking if embedding service available and query provided.
+  // When semantic search is active, fetch ALL candidates (not just FTS matches) so
+  // memories that share meaning but not keywords are included.
+  let ranked: (Memory & { _score: number })[]
+  let total_count: number
 
-  // Rank memories
-  const ranked = rankMemories(allMemories, detectedScopes)
+  if (embeddingService?.available() && query) {
+    const memoriesWithEmbeddings = queryMemoriesWithEmbeddings(db, { scopes, types, excludeInvalidated: true })
+    total_count = memoriesWithEmbeddings.length
+    const queryEmbedding = await embeddingService.embed(query)
+    ranked = rankWithEmbeddings(memoriesWithEmbeddings, queryEmbedding, detectedScopes)
+  } else {
+    const allMemories = queryMemories(db, { scopes, types, query, excludeInvalidated: true })
+    total_count = allMemories.length
+    ranked = rankMemories(allMemories, detectedScopes)
+  }
 
   const antipatterns: Memory[] = []
   const critical: Memory[] = []

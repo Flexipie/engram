@@ -1,5 +1,6 @@
 import type { RequestHandler } from 'express'
 import type { EnforcementStats } from './enforce.js'
+import { toolStats } from './stats.js'
 import { getActiveWorktrees } from '../db/worktrees.js'
 import { DbPool } from '../db/pool.js'
 
@@ -26,6 +27,7 @@ export function createHealthHandler(
         violations: stats.violations,
         warnings: stats.warnings,
       },
+      tools: toolStats,
     })
   }
 }

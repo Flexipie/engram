@@ -7,13 +7,16 @@ import { createSessionsRouter } from './sessions.js'
 import { createErrorsRouter } from './errors.js'
 import { createRecallRouter } from './recall.js'
 import { createEnforceV1Router } from './enforce.js'
+import { createStatsRouter } from './stats.js'
 import type { EngramConfig } from '../../../config.js'
 import type { DbPool } from '../../../db/pool.js'
+import type { EnforcementStats } from '../../enforce.js'
 
 export function createV1Router(
   pool: DbPool,
   globalDb: Database.Database | null,
   config: EngramConfig,
+  enforcementStats?: EnforcementStats,
 ): Router {
   const router = Router()
 
@@ -29,6 +32,7 @@ export function createV1Router(
   router.use('/errors', createErrorsRouter())
   router.use('/recall', createRecallRouter(globalDb))
   router.use('/enforce', createEnforceV1Router(config))
+  router.use('/stats', createStatsRouter(enforcementStats ?? { checks: 0, violations: 0, warnings: 0 }))
 
   return router
 }

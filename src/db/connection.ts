@@ -5,11 +5,13 @@ import { logger } from '../logger.js'
 import sql0001 from './migrations/0001_init.sql'
 import sql0002 from './migrations/0002_memories.sql'
 import sql0004 from './migrations/0004_errors.sql'
+import sql0005 from './migrations/0005_embeddings.sql'
 
 const MIGRATIONS: Array<{ version: number; sql: string }> = [
   { version: 1, sql: sql0001 },
   { version: 2, sql: sql0002 },
   { version: 3, sql: sql0004 },
+  { version: 4, sql: sql0005 },
 ]
 
 export function applyMigrations(db: Database.Database): void {

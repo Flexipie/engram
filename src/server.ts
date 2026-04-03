@@ -16,6 +16,7 @@ import { DbPool } from './db/pool.js'
 import { setActiveProfile } from './domain/active-profile.js'
 import { createV1Router } from './http/api/v1/router.js'
 import { openApiSpec } from './http/api/openapi.js'
+import { OllamaEmbeddingService, NoopEmbeddingService } from './retrieval/embeddings.js'
 
 const isGlobal = process.env.ENGRAM_GLOBAL === 'true'
 const projectDir = isGlobal ? null : (process.env.ENGRAM_PROJECT_DIR ?? process.cwd())
@@ -49,6 +50,11 @@ writeFileSync(pidFile, String(process.pid), 'utf-8')
 // In-memory enforcement stats (reset on restart)
 export const enforcementStats: EnforcementStats = { checks: 0, violations: 0, warnings: 0 }
 
+// Embedding service — disabled by default, enabled via config
+const embeddingService = config.semanticRetrieval.enabled
+  ? new OllamaEmbeddingService(config.semanticRetrieval.ollamaUrl, config.semanticRetrieval.embeddingModel)
+  : new NoopEmbeddingService()
+
 const mode = isGlobal ? 'global' : 'project'
 
 // Express app
@@ -68,7 +74,7 @@ app.post('/snapshot', createSnapshotHandler(pool))
 app.post('/enforce', createEnforceHandler(pool, config, enforcementStats))
 
 // REST API v1
-app.use('/v1', createV1Router(pool, globalDb, config))
+app.use('/v1', createV1Router(pool, globalDb, config, enforcementStats))
 
 // OpenAPI spec
 app.get('/openapi.json', (_req, res) => res.json(openApiSpec))
@@ -77,7 +83,7 @@ app.get('/openapi.json', (_req, res) => res.json(openApiSpec))
 app.post('/mcp', async (req, res) => {
   const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined })
   const server = new McpServer({ name: 'engram', version: '0.1.0' })
-  setupTools(server, pool, globalDb)
+  setupTools(server, pool, globalDb, embeddingService)
   await server.connect(transport)
   await transport.handleRequest(req, res, req.body)
 })

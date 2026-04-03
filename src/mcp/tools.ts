@@ -10,12 +10,15 @@ import { getActiveScopes } from '../domain/active-profile.js'
 import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
 import { DbPool } from '../db/pool.js'
+import { toolStats } from '../http/stats.js'
+import type { EmbeddingService } from '../retrieval/embeddings.js'
 import type Database from 'better-sqlite3'
 
 export function setupTools(
   server: McpServer,
   pool: DbPool,
   globalDb?: Database.Database | null,
+  embeddingService?: EmbeddingService,
 ): void {
   const enforcementConfig = loadConfig(process.cwd())
 
@@ -36,6 +39,8 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleSessionStart(db, params, globalDb ?? null)
+        toolStats.session_start.calls++
+        if (result.task !== null) toolStats.session_start.task_hits++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('session_start failed', err)
@@ -72,6 +77,7 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleUpdateTask(db, params)
+        toolStats.update_task.calls++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('update_task failed', err)
@@ -100,7 +106,15 @@ export function setupTools(
     async (params) => {
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
-        const result = await handleRemember(db, globalDb ?? null, params)
+        const config = loadConfig(process.cwd())
+        const result = await handleRemember(
+          db,
+          globalDb ?? null,
+          params,
+          embeddingService,
+          config.semanticRetrieval.contradictionThreshold,
+        )
+        toolStats.remember.calls++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('remember failed', err)
@@ -141,7 +155,9 @@ export function setupTools(
     async (params) => {
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
-        const result = await handleRecall(db, globalDb ?? null, params)
+        const result = await handleRecall(db, globalDb ?? null, params, embeddingService)
+        toolStats.recall.calls++
+        toolStats.recall.memories_returned += result.critical.length + result.relevant.length
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('recall failed', err)
@@ -168,6 +184,8 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleCheckError(db, params)
+        toolStats.check_error.calls++
+        if ((result as { found?: boolean }).found === true) toolStats.check_error.hits++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('check_error failed', err)
@@ -196,6 +214,7 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleRecordError(db, params)
+        toolStats.record_error.calls++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('record_error failed', err)
@@ -219,6 +238,7 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleInvalidate(db, params)
+        toolStats.invalidate.calls++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('invalidate failed', err)
@@ -237,6 +257,7 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleGetWorktreeStatus(db, params)
+        toolStats.get_worktree_status.calls++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('get_worktree_status failed', err)
@@ -264,6 +285,7 @@ export function setupTools(
       try {
         const db = pool.resolve((params as { worktree?: string }).worktree)
         const result = await handleCheckConventions(db, enforcementConfig, params)
+        toolStats.check_conventions.calls++
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('check_conventions failed', err)

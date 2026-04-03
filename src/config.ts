@@ -2,6 +2,13 @@ import { readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { homedir } from 'os'
 
+export interface SemanticConfig {
+  enabled: boolean
+  ollamaUrl: string
+  embeddingModel: string
+  contradictionThreshold: number
+}
+
 export interface ObserverConfig {
   enabled: boolean
   model: 'ollama' | 'haiku'
@@ -25,6 +32,7 @@ export interface EngramConfig {
   apiKeyRequired: boolean
   apiKeys: string[]
   observer: ObserverConfig
+  semanticRetrieval: SemanticConfig
 }
 
 const OBSERVER_DEFAULTS: ObserverConfig = {
@@ -35,6 +43,13 @@ const OBSERVER_DEFAULTS: ObserverConfig = {
   batchSize: 10,
   flushIntervalMs: 30000,
   port: 7338,
+}
+
+const SEMANTIC_DEFAULTS: SemanticConfig = {
+  enabled: false,
+  ollamaUrl: 'http://localhost:11434',
+  embeddingModel: 'nomic-embed-text',
+  contradictionThreshold: 0.85,
 }
 
 const DEFAULTS: EngramConfig = {
@@ -49,6 +64,7 @@ const DEFAULTS: EngramConfig = {
   apiKeyRequired: false,
   apiKeys: [],
   observer: OBSERVER_DEFAULTS,
+  semanticRetrieval: SEMANTIC_DEFAULTS,
 }
 
 function readJsonFile(filePath: string): Partial<EngramConfig> {

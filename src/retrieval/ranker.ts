@@ -1,4 +1,5 @@
-import type { Memory } from '../db/memories.js'
+import type { Memory, MemoryWithEmbedding } from '../db/memories.js'
+import { cosine, deserializeEmbedding } from './embeddings.js'
 
 export function recencyFactor(lastValidated: string | null): number {
   if (!lastValidated) return 0.9
@@ -21,5 +22,23 @@ export function computeScore(memory: Memory, detectedScopes: string[]): number {
 export function rankMemories(memories: Memory[], detectedScopes: string[]): (Memory & { _score: number })[] {
   return [...memories]
     .map(m => ({ ...m, _score: computeScore(m, detectedScopes) }))
+    .sort((a, b) => b._score - a._score || b.evidence_count - a.evidence_count)
+}
+
+export function rankWithEmbeddings(
+  memories: MemoryWithEmbedding[],
+  queryEmbedding: Float32Array | null,
+  detectedScopes: string[],
+): (Memory & { _score: number; _vector_sim?: number })[] {
+  return [...memories]
+    .map(m => {
+      const ftsScore = computeScore(m, detectedScopes)
+      if (queryEmbedding && m.embedding) {
+        const memEmbedding = deserializeEmbedding(m.embedding)
+        const vectorSim = cosine(queryEmbedding, memEmbedding)
+        return { ...m, _score: 0.5 * ftsScore + 0.5 * vectorSim, _vector_sim: vectorSim }
+      }
+      return { ...m, _score: ftsScore }
+    })
     .sort((a, b) => b._score - a._score || b.evidence_count - a.evidence_count)
 }
