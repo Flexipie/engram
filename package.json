@@ -1,5 +1,6 @@
 {
   "name": "engram",
+  "workspaces": ["packages/sdk"],
   "version": "0.1.0",
   "description": "Persistent project intelligence layer for AI coding agents",
   "type": "module",
