@@ -52,4 +52,31 @@ describe('v1 sessions', () => {
     expect(res.body).toHaveProperty('task')
     expect(res.body.task.title).toBe('My Task')
   })
+
+  // Regression: Bug 1 — GET /v1/sessions/current must use req.worktree, not a hardcoded path
+  it('GET /v1/sessions/current returns 404 for a worktree with no tasks', async () => {
+    // Create a task for /test/worktree
+    await request(app)
+      .patch('/v1/sessions/current')
+      .send({ worktree: '/test/worktree', title: 'Task A', goal: 'goal' })
+
+    // Querying a different worktree should NOT return Task A
+    const res = await request(app).get('/v1/sessions/current').query({ worktree: '/other/project' })
+    expect(res.status).toBe(404)
+  })
+
+  it('GET /v1/sessions/current returns the correct task for its specific worktree', async () => {
+    // Create tasks for two worktrees (same underlying test DB via createTestPool)
+    await request(app)
+      .patch('/v1/sessions/current')
+      .send({ worktree: '/project/alpha', title: 'Alpha Task', goal: 'alpha goal' })
+    await request(app)
+      .patch('/v1/sessions/current')
+      .send({ worktree: '/project/beta', title: 'Beta Task', goal: 'beta goal' })
+
+    // Querying /project/alpha should return Alpha Task, not Beta Task
+    const res = await request(app).get('/v1/sessions/current').query({ worktree: '/project/alpha' })
+    expect(res.status).toBe(200)
+    expect(res.body.task.title).toBe('Alpha Task')
+  })
 })

@@ -5,6 +5,7 @@ import type Database from 'better-sqlite3'
 declare module 'express-serve-static-core' {
   interface Request {
     db?: Database.Database
+    worktree?: string
   }
 }
 
@@ -15,6 +16,7 @@ export function createWorktreeMiddleware(pool: DbPool): RequestHandler {
 
     try {
       req.db = pool.resolve(worktree)
+      req.worktree = worktree
       next()
     } catch {
       res.status(400).json({ error: 'worktree is required in global mode' })

@@ -1,7 +1,6 @@
 import { Router } from 'express'
 import type Database from 'better-sqlite3'
 import {
-  insertMemory,
   queryMemories,
   getMemoryById,
   invalidateMemory,
@@ -9,18 +8,19 @@ import {
   decreaseConfidence,
   MEMORY_TYPES,
 } from '../../../db/memories.js'
+import { handleRemember } from '../../../mcp/handlers/memory.js'
+import type { EmbeddingService } from '../../../retrieval/embeddings.js'
 
-export function createMemoriesRouter(): Router {
+export function createMemoriesRouter(embeddingService?: EmbeddingService): Router {
   const router = Router()
 
-  // POST /v1/memories — create
-  router.post('/', (req, res): void => {
+  // POST /v1/memories — create (runs full semantic pipeline: embedding + contradiction detection)
+  router.post('/', async (req, res): Promise<void> => {
     const db = req.db as Database.Database
-    const { type, scope, content, confidence, source } = req.body as {
+    const { type, scope, content, source } = req.body as {
       type?: string
       scope?: string
       content?: string
-      confidence?: number
       source?: string
     }
 
@@ -37,15 +37,17 @@ export function createMemoriesRouter(): Router {
       return
     }
 
-    const id = insertMemory(db, {
-      type: type as (typeof MEMORY_TYPES)[number],
-      scope,
-      content,
-      confidence,
-      source: source ?? 'agent',
-    })
-
-    res.status(201).json({ id })
+    try {
+      const result = await handleRemember(
+        db,
+        null,
+        { type, scope, content, source: source ?? 'agent', worktree: req.worktree },
+        embeddingService,
+      )
+      res.status(201).json(result)
+    } catch (err) {
+      res.status(500).json({ error: String(err) })
+    }
   })
 
   // GET /v1/memories — list

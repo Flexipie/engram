@@ -5,7 +5,7 @@ Universal convention memory layer for agentic AI. Any agent, any domain, any tea
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility strategy.
 
-## Status: Phases 1–7 + Phase 9 Complete ✓ | 294 tests passing
+## Status: Phases 1–7 + Phase 9 Complete ✓ | Phase 8 Partially Landed | Hardening Sprint ✓ | 342 tests passing
 
 ---
 
@@ -214,18 +214,36 @@ See [ARCHITECTURE.md](ARCHITECTURE.md) for design principles and extensibility s
 
 ---
 
-## Phase 8 — Semantic Retrieval + Contradiction Detection
+## Phase 8 — Semantic Retrieval + Contradiction Detection ⚠ In Progress (partially landed)
 
 **Goal:** Find memories by meaning, not just keywords.
 
-### To implement
-- [ ] `sqlite-vec` extension — vector KNN search inside SQLite
-- [ ] `nomic-embed-text` via Ollama — offline embeddings, graceful FTS5 fallback
-- [ ] `memories.embedding BLOB` column + migration
+### Already in main
+- [x] `memories.embedding BLOB` column + migration (`src/db/migrations/0005_embeddings.sql`)
+- [x] `EmbeddingService` — Ollama `nomic-embed-text` + graceful FTS5 fallback
+- [x] `updateMemoryEmbedding()`, `queryMemoriesWithEmbeddings()` in `src/db/memories.ts`
+- [x] Contradiction detection in `handleRemember()` — cosine similarity > 0.85 → `contradicts_with` warnings
+- [x] Hybrid reranking in `buildContextPacket()` — FTS5 + vector union
+- [x] Per-tool telemetry (tool stats on `GET /v1/stats`, missing from OpenAPI spec)
+
+### Still to implement
 - [ ] `memory_edges` table: `(from_id, to_id, relation: 'implies'|'contradicts'|'supersedes'|'related')`
-- [ ] Similarity check on `insertMemory()` — auto-create `contradicts` edge on similarity > 0.85
-- [ ] `recall()` upgrade — hybrid FTS5 + vector union, rerank by combined score
 - [ ] `traverse_graph: true` option — return memory + graph neighbors via recursive CTE
+
+---
+
+## Hardening Sprint ✓ DONE
+
+**Goal:** Fix contract gaps between MCP, REST, and observer. Re-baseline trust. SDK is unblocked.
+
+### Completed
+- [x] **`GET /v1/sessions/current` hardcoded fallback** — stored `req.worktree` in worktree middleware; removed `?? '/test/worktree'`, falls back to `process.cwd()` in non-global mode (`src/http/api/middleware/worktree.ts`, `src/http/api/v1/sessions.ts`)
+- [x] **Worktree-unaware recall/write paths** — added `worktree?: string` to `RememberSchema` + `RecallSchema`; `detectScopes` and `project_origin` now use explicit worktree param (`src/mcp/handlers/memory.ts`); REST recall injects `req.worktree` (`src/http/api/v1/recall.ts`)
+- [x] **REST memory writes bypass semantic pipeline** — `EmbeddingService` threaded through `createV1Router` → `createMemoriesRouter` → `createRecallRouter`; `POST /v1/memories` now calls `handleRemember()` (embeddings + contradiction detection); `source: 'observer'` added to enum with correct 0.4 confidence (`src/http/api/v1/memories.ts`, `router.ts`, `server.ts`, `test-app.ts`)
+- [x] **Shallow config merge** — `deepMerge()` helper replaces spread in `loadConfig()`; partial `observer`/`semanticRetrieval` blocks preserve defaults (`src/config.ts`)
+- [x] **`GET /v1/stats` missing from OpenAPI** — documented with full tool + enforcement response schema; `POST /v1/memories` response updated with `contradicts_with` shape (`src/http/api/openapi.ts`)
+- [x] Regression tests: `config.test.ts` (new, 7 tests), extensions to `v1-sessions`, `memory-handler`, `v1-memories`, `v1-recall`
+- [x] **342 tests passing** (up from 323)
 
 ---
 

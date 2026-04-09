@@ -67,6 +67,27 @@ const DEFAULTS: EngramConfig = {
   semanticRetrieval: SEMANTIC_DEFAULTS,
 }
 
+function deepMerge<T extends Record<string, unknown>>(
+  defaults: T,
+  ...overrides: Partial<T>[]
+): T {
+  let result = { ...defaults }
+  for (const override of overrides) {
+    for (const key in override) {
+      const val = override[key]
+      if (val !== undefined && val !== null && typeof val === 'object' && !Array.isArray(val)) {
+        result[key] = {
+          ...(result[key] as Record<string, unknown>),
+          ...(val as Record<string, unknown>),
+        } as T[typeof key]
+      } else if (val !== undefined) {
+        result[key] = val as T[typeof key]
+      }
+    }
+  }
+  return result
+}
+
 function readJsonFile(filePath: string): Partial<EngramConfig> {
   if (!existsSync(filePath)) return {}
   try {
@@ -87,9 +108,5 @@ export function loadConfig(projectDir?: string): EngramConfig {
     projectConfig = readJsonFile(projectConfigPath)
   }
 
-  return {
-    ...DEFAULTS,
-    ...globalConfig,
-    ...projectConfig,
-  }
+  return deepMerge(DEFAULTS, globalConfig, projectConfig)
 }

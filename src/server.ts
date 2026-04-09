@@ -74,7 +74,7 @@ app.post('/snapshot', createSnapshotHandler(pool))
 app.post('/enforce', createEnforceHandler(pool, config, enforcementStats))
 
 // REST API v1
-app.use('/v1', createV1Router(pool, globalDb, config, enforcementStats))
+app.use('/v1', createV1Router(pool, globalDb, config, enforcementStats, embeddingService))
 
 // OpenAPI spec
 app.get('/openapi.json', (_req, res) => res.json(openApiSpec))

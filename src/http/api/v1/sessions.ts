@@ -24,7 +24,7 @@ export function createSessionsRouter(globalDb: Database.Database | null): Router
   // GET /v1/sessions/current — get current task
   router.get('/current', (req, res): void => {
     const db = req.db as Database.Database
-    const worktree = (req.query['worktree'] as string | undefined) ?? '/test/worktree'
+    const worktree = req.worktree ?? process.cwd()
     const task = db.prepare(
       `SELECT id, worktree, title, goal, status, session_id, started_at, updated_at, archived_at
        FROM tasks WHERE worktree = ? AND status = 'active' ORDER BY updated_at DESC LIMIT 1`,

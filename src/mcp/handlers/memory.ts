@@ -23,8 +23,9 @@ const RememberSchema = z.object({
   content: z.string().describe('The knowledge to store'),
   type: z.enum(MEMORY_TYPES),
   scope: scopeField(),
-  source: z.enum(['agent', 'manual']).optional().default('agent'),
+  source: z.enum(['agent', 'manual', 'observer']).optional().default('agent'),
   global: z.boolean().optional().default(false),
+  worktree: z.string().optional(),
 })
 
 const RecallSchema = z.object({
@@ -33,6 +34,7 @@ const RecallSchema = z.object({
   query: z.string().optional(),
   include_global: z.boolean().optional().default(false),
   limit: z.number().int().min(1).max(50).optional(),
+  worktree: z.string().optional(),
 })
 
 const InvalidateSchema = z.object({
@@ -59,7 +61,8 @@ export async function handleRemember(
   contradictionThreshold = 0.85,
 ): Promise<RememberResult> {
   const data = RememberSchema.parse(params)
-  const confidence = data.source === 'manual' ? 0.8 : 0.5
+  const confidence = data.source === 'manual' ? 0.8 : data.source === 'observer' ? 0.4 : 0.5
+  const worktree = data.worktree ?? process.cwd()
 
   if (data.global) {
     if (!globalDb) throw new Error('Global DB not available — start server with global memory enabled')
@@ -69,8 +72,8 @@ export async function handleRemember(
       content: data.content,
       confidence,
       source: data.source,
-      project_origin: process.cwd(),
-      project_hint: process.cwd().split('/').pop() ?? '',
+      project_origin: worktree,
+      project_hint: worktree.split('/').pop() ?? '',
     })
     return { id }
   }
@@ -115,7 +118,7 @@ export async function handleRecall(
   embeddingService?: EmbeddingService,
 ): Promise<ContextPacket> {
   const data = RecallSchema.parse(params)
-  const detectedScopes = await detectScopes(process.cwd())
+  const detectedScopes = await detectScopes(data.worktree ?? process.cwd())
 
   return buildContextPacket(db, {
     detectedScopes,

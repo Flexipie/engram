@@ -136,8 +136,9 @@ engram service status
 | 5 — Convention Enforcement | Violations caught pre-write | ✓ |
 | 6 — Domain Profiles + Bootstrap/GC/Export | Any domain, day-one value | ✓ |
 | 7 — Full REST API | Any HTTP client, OpenAPI spec | ✓ |
-| 8 — Semantic Retrieval | Vector KNN + contradiction detection | Planned |
+| 8 — Semantic Retrieval | Vector KNN + contradiction detection | In Progress |
 | 9 — Auto-Extraction Observer | Passive learning from tool events | ✓ |
+| Hardening Sprint | Fix MCP/REST/observer contract gaps | ✓ |
 | 10 — TypeScript/Python SDK | Embed in any agent framework | Planned |
 | 11 — Cloud Sync + Team Memory | Shared knowledge across team | Planned |
 | 12 — Memory Marketplace | Community convention packs | Planned |

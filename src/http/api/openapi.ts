@@ -25,7 +25,7 @@ export const openApiSpec = {
                   scope: { type: 'string' },
                   content: { type: 'string' },
                   confidence: { type: 'number', minimum: 0, maximum: 1 },
-                  source: { type: 'string', enum: ['agent', 'manual'] },
+                  source: { type: 'string', enum: ['agent', 'manual', 'observer'] },
                 },
               },
             },
@@ -34,7 +34,28 @@ export const openApiSpec = {
         responses: {
           '201': {
             description: 'Memory created',
-            content: { 'application/json': { schema: { type: 'object', properties: { id: { type: 'string' } } } } },
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    id: { type: 'string' },
+                    contradicts_with: {
+                      type: 'array',
+                      description: 'Memories with high semantic similarity (possible contradictions)',
+                      items: {
+                        type: 'object',
+                        properties: {
+                          id: { type: 'string' },
+                          content: { type: 'string' },
+                          similarity: { type: 'number' },
+                        },
+                      },
+                    },
+                  },
+                },
+              },
+            },
           },
         },
       },
@@ -153,6 +174,48 @@ export const openApiSpec = {
         summary: 'Check conventions for a file',
         operationId: 'enforce',
         responses: { '200': { description: 'Enforcement result' } },
+      },
+    },
+    '/v1/stats': {
+      get: {
+        summary: 'Get per-tool call telemetry and enforcement stats',
+        operationId: 'getStats',
+        responses: {
+          '200': {
+            description: 'Tool and enforcement statistics (reset on server restart)',
+            content: {
+              'application/json': {
+                schema: {
+                  type: 'object',
+                  properties: {
+                    tools: {
+                      type: 'object',
+                      properties: {
+                        session_start: { type: 'object', properties: { calls: { type: 'integer' }, task_hits: { type: 'integer' } } },
+                        remember: { type: 'object', properties: { calls: { type: 'integer' } } },
+                        recall: { type: 'object', properties: { calls: { type: 'integer' }, memories_returned: { type: 'integer' } } },
+                        check_error: { type: 'object', properties: { calls: { type: 'integer' }, hits: { type: 'integer' } } },
+                        record_error: { type: 'object', properties: { calls: { type: 'integer' } } },
+                        invalidate: { type: 'object', properties: { calls: { type: 'integer' } } },
+                        update_task: { type: 'object', properties: { calls: { type: 'integer' } } },
+                        get_worktree_status: { type: 'object', properties: { calls: { type: 'integer' } } },
+                        check_conventions: { type: 'object', properties: { calls: { type: 'integer' } } },
+                      },
+                    },
+                    enforcement: {
+                      type: 'object',
+                      properties: {
+                        checks: { type: 'integer' },
+                        violations: { type: 'integer' },
+                        warnings: { type: 'integer' },
+                      },
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
       },
     },
   },

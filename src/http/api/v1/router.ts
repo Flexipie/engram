@@ -11,12 +11,14 @@ import { createStatsRouter } from './stats.js'
 import type { EngramConfig } from '../../../config.js'
 import type { DbPool } from '../../../db/pool.js'
 import type { EnforcementStats } from '../../enforce.js'
+import type { EmbeddingService } from '../../../retrieval/embeddings.js'
 
 export function createV1Router(
   pool: DbPool,
   globalDb: Database.Database | null,
   config: EngramConfig,
   enforcementStats?: EnforcementStats,
+  embeddingService?: EmbeddingService,
 ): Router {
   const router = Router()
 
@@ -27,10 +29,10 @@ export function createV1Router(
   router.use(createWorktreeMiddleware(pool))
 
   // Mount sub-routers
-  router.use('/memories', createMemoriesRouter())
+  router.use('/memories', createMemoriesRouter(embeddingService))
   router.use('/sessions', createSessionsRouter(globalDb))
   router.use('/errors', createErrorsRouter())
-  router.use('/recall', createRecallRouter(globalDb))
+  router.use('/recall', createRecallRouter(globalDb, embeddingService))
   router.use('/enforce', createEnforceV1Router(config))
   router.use('/stats', createStatsRouter(enforcementStats ?? { checks: 0, violations: 0, warnings: 0 }))
 

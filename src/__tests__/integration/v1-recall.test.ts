@@ -1,10 +1,11 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import request from 'supertest'
 import { createTestDb, createTestPool } from '../setup.js'
 import { createTestApp } from '../test-app.js'
 import { insertMemory } from '../../db/memories.js'
 import type Database from 'better-sqlite3'
 import type { Express } from 'express'
+import type { EmbeddingService } from '../../retrieval/embeddings.js'
 
 describe('v1 recall', () => {
   let db: Database.Database
@@ -59,4 +60,47 @@ describe('v1 recall', () => {
     expect(res.status).toBe(200)
     expect(res.body.antipatterns.length).toBeGreaterThan(0)
   })
+})
+
+// Regression: Bug 2 + Bug 3 — worktree and embeddingService must flow through REST recall
+describe('v1 recall — worktree and embedding wiring', () => {
+  let db: Database.Database
+
+  afterEach(() => {
+    db.close()
+    vi.restoreAllMocks()
+  })
+
+  it('POST /v1/recall passes embeddingService to handleRecall', async () => {
+    db = createTestDb()
+    insertMemory(db, { type: 'convention', scope: 'api', content: 'zod validation', source: 'manual', confidence: 0.8 })
+    const pool = createTestPool(db)
+
+    const mockService: EmbeddingService = {
+      available: () => true,
+      embed: vi.fn().mockResolvedValue(new Float32Array(4).fill(0.1)),
+    }
+    const app = createTestApp(pool, null, {}, undefined, mockService)
+
+    const res = await request(app).post('/v1/recall').send({ query: 'zod' })
+    expect(res.status).toBe(200)
+    // embed should have been called for the query
+    expect(mockService.embed).toHaveBeenCalledWith('zod')
+  }, 10000)
+
+  it('POST /v1/recall with explicit worktree param completes without timeout', async () => {
+    // Regression for Bug 2: if process.cwd() is used instead of req.worktree,
+    // detectScopes runs git in the actual large repo which can time out.
+    // Passing a non-git path forces git to fail fast.
+    db = createTestDb()
+    const pool = createTestPool(db)
+    const app = createTestApp(pool, null)
+
+    const res = await request(app)
+      .post('/v1/recall')
+      .send({ worktree: '/tmp/not-a-git-repo-xyz' })
+
+    expect(res.status).toBe(200)
+    expect(res.body).toHaveProperty('total_count')
+  }, 10000)
 })

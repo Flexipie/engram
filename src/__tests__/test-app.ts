@@ -5,6 +5,7 @@ import type { EngramConfig } from '../config.js'
 import type { EnforcementStats } from '../http/enforce.js'
 import { createV1Router } from '../http/api/v1/router.js'
 import { openApiSpec } from '../http/api/openapi.js'
+import { NoopEmbeddingService, type EmbeddingService } from '../retrieval/embeddings.js'
 
 const DEFAULT_CONFIG: EngramConfig = {
   port: 7337,
@@ -39,12 +40,13 @@ export function createTestApp(
   globalDb: Database.Database | null,
   configOverride: Partial<EngramConfig> = {},
   enforcementStats: EnforcementStats = { checks: 0, violations: 0, warnings: 0 },
+  embeddingService: EmbeddingService = new NoopEmbeddingService(),
 ): express.Express {
   const config: EngramConfig = { ...DEFAULT_CONFIG, ...configOverride }
 
   const app = express()
   app.use(express.json())
-  app.use('/v1', createV1Router(pool, globalDb, config, enforcementStats))
+  app.use('/v1', createV1Router(pool, globalDb, config, enforcementStats, embeddingService))
   app.get('/openapi.json', (_req, res) => res.json(openApiSpec))
 
   return app

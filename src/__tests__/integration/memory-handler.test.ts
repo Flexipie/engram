@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import Database from 'better-sqlite3'
-import { createTestDb, teardownDb } from '../setup.js'
+import { createTestDb, createTestGlobalDb, teardownDb } from '../setup.js'
 import { handleRemember, handleRecall, handleInvalidate } from '../../mcp/handlers/memory.js'
 
 describe('memory handlers', () => {
@@ -112,5 +112,49 @@ describe('memory handlers', () => {
         scope: 'invalid_scope',
       }),
     ).rejects.toThrow()
+  })
+
+  // Regression: Bug 2 — process.cwd() used instead of worktree param
+  it('handleRemember with source:observer sets confidence to 0.4', async () => {
+    const { id } = await handleRemember(db, null, {
+      content: 'observer extracted rule',
+      type: 'convention',
+      scope: 'api',
+      source: 'observer',
+    })
+    const m = db.prepare('SELECT * FROM memories WHERE id = ?').get(id) as { confidence: number }
+    expect(m.confidence).toBe(0.4)
+  })
+
+  it('handleRemember with global:true uses worktree param for project_origin', async () => {
+    const globalDb = createTestGlobalDb()
+    try {
+      const { id } = await handleRemember(db, globalDb, {
+        content: 'global rule',
+        type: 'convention',
+        scope: 'general',
+        global: true,
+        worktree: '/my/explicit/project',
+      })
+      const row = globalDb.prepare('SELECT * FROM global_memories WHERE id = ?').get(id) as {
+        project_origin: string
+        project_hint: string
+      }
+      expect(row.project_origin).toBe('/my/explicit/project')
+      expect(row.project_hint).toBe('project')
+    } finally {
+      globalDb.close()
+    }
+  })
+
+  it('handleRecall with worktree param completes without using server cwd', async () => {
+    // Pass an explicit worktree that is NOT a git repo — detectScopes should return [] quickly
+    // and not run git in the server's real cwd (which is large and slow)
+    const packet = await handleRecall(db, null, {
+      worktree: '/tmp/not-a-git-repo-xyz',
+    })
+    expect(packet).toHaveProperty('critical')
+    expect(packet).toHaveProperty('relevant')
+    expect(packet).toHaveProperty('total_count')
   })
 })
