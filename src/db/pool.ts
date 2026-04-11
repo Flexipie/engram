@@ -1,5 +1,6 @@
 import Database from 'better-sqlite3'
 import { openProjectDb } from './connection.js'
+import { resolveProjectRoot } from './resolve-root.js'
 
 export class DbPool {
   private dbs = new Map<string, Database.Database>()
@@ -25,7 +26,7 @@ export class DbPool {
   resolve(worktree?: string): Database.Database {
     const dir = worktree ?? this.defaultWorktree
     if (!dir) throw new Error('worktree required — no default configured')
-    return this.get(dir)
+    return this.get(resolveProjectRoot(dir))
   }
 
   getAllDbs(): Database.Database[] {

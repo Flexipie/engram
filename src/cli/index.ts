@@ -15,6 +15,7 @@ import { runGcCommand } from './commands/gc.js'
 import { runExportCommand, runImportCommand } from './commands/export.js'
 import { runApiKeyGenerate, runApiKeyList, runApiKeyRevoke } from './commands/apikey.js'
 import { runObserverStart, runObserverStop, runObserverStatus } from './commands/observer.js'
+import { runSetup } from './commands/setup.js'
 
 const program = new Command()
 
@@ -22,6 +23,20 @@ program
   .name('engram')
   .description('Persistent project intelligence layer for AI coding agents')
   .version('0.1.0')
+
+program
+  .command('setup')
+  .description('One-command project onboarding: init, start server, register MCP, bootstrap')
+  .option('--domain <profile>', 'Domain profile (software, legal, research, general)', 'software')
+  .option('--no-service', 'Skip launchd install, use per-project engram start instead')
+  .option('--skip-bootstrap', 'Skip codebase bootstrap step')
+  .action(async (options: { domain?: string; service?: boolean; skipBootstrap?: boolean }) => {
+    await runSetup(process.cwd(), {
+      domain: options.domain,
+      noService: options.service === false,
+      skipBootstrap: options.skipBootstrap ?? false,
+    })
+  })
 
 program
   .command('init')

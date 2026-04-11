@@ -13,8 +13,10 @@ if [ -z "$TOOL" ]; then
   exit 0
 fi
 
+OBS_PORT=$(cat "${CLAUDE_PROJECT_DIR}/.engram/observer-port" 2>/dev/null || echo "7338")
+
 # Post to observer (fire-and-forget, timeout 1s)
-curl -s --max-time 1 -X POST http://localhost:7338/event \
+curl -s --max-time 1 -X POST "http://localhost:${OBS_PORT}/event" \
   -H "Content-Type: application/json" \
   -d "{\"tool\": \"$TOOL\", \"file_path\": \"$FILE_PATH\", \"exit_status\": $EXIT_STATUS}" \
   > /dev/null 2>&1

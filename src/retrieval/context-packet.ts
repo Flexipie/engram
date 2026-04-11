@@ -11,6 +11,10 @@ export interface ContextPacket {
   global: GlobalMemory[]
   total_count: number
   scopes_available: string[]
+  also_found?: {
+    scopes: string[]
+    total: number
+  }
 }
 
 export async function buildContextPacket(
@@ -26,7 +30,7 @@ export async function buildContextPacket(
     embeddingService?: EmbeddingService
   },
 ): Promise<ContextPacket> {
-  const { detectedScopes, scopes, types, query, includeGlobal = false, limit = 15, globalDb, embeddingService } = opts
+  const { detectedScopes, scopes, types, query, includeGlobal = true, limit = 15, globalDb, embeddingService } = opts
 
   // scopes_available: all unique scopes from all non-invalidated memories (not filtered)
   const allForScopes = queryMemories(db, { excludeInvalidated: true })
@@ -77,6 +81,17 @@ export async function buildContextPacket(
     global = globalRanked.slice(0, 5) as unknown as GlobalMemory[]
   }
 
+  // Compute also_found: memories in ranked that weren't returned (below score threshold or capped)
+  const returnedIds = new Set([...critical, ...relevant, ...antipatterns].map((m) => m.id))
+  const notReturned = ranked.filter((m) => !returnedIds.has(m.id))
+  const also_found =
+    notReturned.length > 0
+      ? {
+          scopes: [...new Set(notReturned.map((m) => m.scope))],
+          total: ranked.length,
+        }
+      : undefined
+
   return {
     critical,
     relevant,
@@ -84,5 +99,6 @@ export async function buildContextPacket(
     global,
     total_count,
     scopes_available,
+    also_found,
   }
 }

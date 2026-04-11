@@ -1,21 +1,14 @@
 import Database from 'better-sqlite3'
-import { mkdirSync, existsSync, readFileSync } from 'fs'
-import { join, dirname } from 'path'
+import { mkdirSync, existsSync } from 'fs'
+import { join } from 'path'
 import { homedir } from 'os'
-import { fileURLToPath } from 'url'
 import { v4 as uuidv4 } from 'uuid'
 import { logger } from '../logger.js'
 import type { GlobalMemory, MemoryType, MemoryScope, QueryMemoriesOpts } from './memories.js'
-
-const __dirname = dirname(fileURLToPath(import.meta.url))
+import sql0003 from './migrations/0003_global.sql'
 
 export function globalDbPath(): string {
   return join(homedir(), '.engram', 'global.db')
-}
-
-function loadGlobalMigrationSql(): string {
-  const filePath = join(__dirname, 'migrations', '0003_global.sql')
-  return readFileSync(filePath, 'utf-8')
 }
 
 function applyGlobalMigrations(db: Database.Database): void {
@@ -29,7 +22,7 @@ function applyGlobalMigrations(db: Database.Database): void {
   const existing = db.prepare('SELECT version FROM _schema_version WHERE version = ?').get(1)
   if (existing) return
 
-  const sql = loadGlobalMigrationSql()
+  const sql = sql0003
   // Remove standalone _schema_version CREATE TABLE — already created above
   const cleanedSql = sql.replace(/CREATE TABLE IF NOT EXISTS _schema_version[\s\S]*?;/, '')
 
@@ -96,6 +89,11 @@ export function insertGlobalMemory(db: Database.Database, data: InsertGlobalMemo
 
 function sanitizeFtsQuery(q: string): string {
   return q.replace(/['"*^():.]/g, ' ').replace(/\s+/g, ' ').trim()
+}
+
+export function getAvailableGlobalScopes(db: Database.Database): string[] {
+  const rows = db.prepare('SELECT DISTINCT scope FROM global_memories WHERE invalidated = 0').all() as { scope: string }[]
+  return rows.map((r) => r.scope)
 }
 
 export function queryGlobalMemories(

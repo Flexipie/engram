@@ -68,7 +68,7 @@ export async function handleSessionStart(
   const detectedScopes = await detectScopes(worktree)
   const memories = await buildContextPacket(db, {
     detectedScopes,
-    includeGlobal: config?.alwaysIncludeGlobal ?? false,
+    includeGlobal: config?.alwaysIncludeGlobal ?? true,
     globalDb: globalDb ?? undefined,
   })
 

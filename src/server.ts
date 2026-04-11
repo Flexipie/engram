@@ -89,6 +89,7 @@ app.post('/mcp', async (req, res) => {
 })
 
 // Start server
+const portFile = join(baseDir, 'port')
 const httpServer = app.listen(port, () => {
   const runningInfo = {
     pid: process.pid,
@@ -98,6 +99,7 @@ const httpServer = app.listen(port, () => {
     project_dir: projectDir,
   }
   writeFileSync(runningFile, JSON.stringify(runningInfo, null, 2), 'utf-8')
+  writeFileSync(portFile, String(port), 'utf-8')
   logger.info(`Engram server listening on port ${port}`, { pid: process.pid, port, mode })
 })
 
@@ -109,6 +111,7 @@ function shutdown(): void {
     if (globalDb) globalDb.close()
     if (existsSync(pidFile)) rmSync(pidFile)
     if (existsSync(runningFile)) rmSync(runningFile)
+    if (existsSync(portFile)) rmSync(portFile)
     logger.info('Shutdown complete')
     process.exit(0)
   })

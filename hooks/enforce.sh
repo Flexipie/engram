@@ -1,11 +1,12 @@
 #!/bin/bash
+PORT=$(cat "${CLAUDE_PROJECT_DIR}/.engram/port" 2>/dev/null || echo "7337")
 INPUT=$(cat)
 TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // empty')
 if [ "$TOOL_NAME" = "Write" ]; then
   FILE_PATH=$(echo "$INPUT" | jq -r '.tool_input.file_path // empty')
   if [ -n "$FILE_PATH" ]; then
     WORKTREE=$(git rev-parse --show-toplevel 2>/dev/null || pwd)
-    RESULT=$(curl -s -X POST http://localhost:7337/enforce \
+    RESULT=$(curl -s -X POST "http://localhost:${PORT}/enforce" \
       -H "Content-Type: application/json" \
       -d "{\"file_path\": \"$FILE_PATH\", \"worktree\": \"$WORKTREE\"}" \
       --max-time 2)

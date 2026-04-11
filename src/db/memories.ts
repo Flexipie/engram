@@ -194,6 +194,11 @@ export function invalidateMemory(db: Database.Database, id: string, reason?: str
   return result.changes > 0
 }
 
+export function getAvailableScopes(db: Database.Database): string[] {
+  const rows = db.prepare('SELECT DISTINCT scope FROM memories WHERE invalidated = 0').all() as { scope: string }[]
+  return rows.map((r) => r.scope)
+}
+
 export function getMemoryById(db: Database.Database, id: string): Memory | null {
   return (db.prepare('SELECT * FROM memories WHERE id = ?').get(id) as Memory | undefined) ?? null
 }

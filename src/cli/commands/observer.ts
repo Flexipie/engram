@@ -68,6 +68,12 @@ export async function runObserverStart(projectDir: string = process.cwd()): Prom
 
   writeFileSync(pidFile, String(child.pid), 'utf-8')
 
+  // Write observer port so hook scripts can read it without hardcoding
+  const { loadConfig } = await import('../../config.js')
+  const config = loadConfig(projectDir)
+  const observerPortFile = join(engramDir, 'observer-port')
+  writeFileSync(observerPortFile, String(config.observer.port), 'utf-8')
+
   console.log(chalk.green(`Observer started (PID ${child.pid})`))
   console.log(chalk.gray(`  Log: ${logFile}`))
 }

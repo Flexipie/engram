@@ -23,6 +23,12 @@ You have access to an Engram MCP server at http://localhost:7337/mcp. Persistent
 1. \`session_start()\` — returns your previous task + relevant memories
 2. Check \`memories.critical\` and \`memories.antipatterns\` before doing anything
 
+**During the session:**
+- Need to recall something → \`recall({ query?, scopes?, types? })\` — global memories included by default
+- Don't know what memories exist → \`browse_memories({ scope?, type? })\` — flat list, no query needed
+- Something that should persist → \`remember({ content, type, scope })\`
+- Memory is wrong → \`invalidate({ id, reason })\`
+
 **The goal:** Every session makes the next session smarter.
 ${SENTINEL_END}
 `

@@ -21,7 +21,8 @@ You have access to an Engram MCP server at http://localhost:7337/mcp. Persistent
   - `type`: `convention` | `anti_pattern` | `decision` | `snippet`
   - `scope`: `api` | `database` | `testing` | `auth` | `components` | `config` | `utils` | `services` | `types` | `state` | `routing` | `scripts` | `build` | `infra` | `general`
   - Use `source: "manual"` for high-confidence rules (confidence 0.8 vs 0.5)
-- Need to recall something → `recall({ query?, scopes?, types? })`
+- Need to recall something → `recall({ query?, scopes?, types? })` — global memories included by default
+- Don't know what memories exist → `browse_memories({ scope?, type? })` — flat list, no query needed
 - Memory is wrong → `invalidate({ id, reason })`
 
 **The goal:** Every session makes the next session smarter.

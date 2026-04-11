@@ -5,7 +5,8 @@ import { handleRemember, handleRecall, handleInvalidate } from './handlers/memor
 import { handleCheckError, handleRecordError } from './handlers/error.js'
 import { handleCheckConventions } from './handlers/enforce.js'
 import { handleGetWorktreeStatus } from './handlers/worktree.js'
-import { MEMORY_TYPES } from '../db/memories.js'
+import { MEMORY_TYPES, queryMemories, getAvailableScopes } from '../db/memories.js'
+import { queryGlobalMemories, getAvailableGlobalScopes } from '../db/global.js'
 import { getActiveScopes } from '../domain/active-profile.js'
 import { loadConfig } from '../config.js'
 import { logger } from '../logger.js'
@@ -261,6 +262,49 @@ export function setupTools(
         return { content: [{ type: 'text', text: JSON.stringify(result) }] }
       } catch (err) {
         logger.error('get_worktree_status failed', err)
+        throw err
+      }
+    },
+  )
+
+  server.tool(
+    'browse_memories',
+    'List all stored memories without needing a query — like ls before grep. Use when you want to see what knowledge exists.',
+    {
+      worktree: z.string().optional().describe('Absolute path to worktree (defaults to cwd)'),
+      scope: z.string().optional().describe('Filter by a single scope'),
+      type: z.enum(MEMORY_TYPES).optional().describe('Filter by memory type'),
+      include_global: z.boolean().optional().default(true).describe('Include global memories'),
+      limit: z.number().int().min(1).max(100).optional().default(50).describe('Max memories to return'),
+    },
+    async (params) => {
+      try {
+        const p = params as { worktree?: string; scope?: string; type?: typeof MEMORY_TYPES[number]; include_global?: boolean; limit?: number }
+        const db = pool.resolve(p.worktree)
+        const scopes = p.scope ? [p.scope] : undefined
+        const types = p.type ? [p.type] : undefined
+        const limit = p.limit ?? 50
+        const includeGlobal = p.include_global ?? true
+
+        const memories = queryMemories(db, { scopes, types, excludeInvalidated: true }).slice(0, limit)
+        const scopes_available = getAvailableScopes(db)
+
+        let globalMemories: ReturnType<typeof queryGlobalMemories> = []
+        let globalScopesAvailable: string[] = []
+        if (includeGlobal && globalDb) {
+          globalMemories = queryGlobalMemories(globalDb, { scopes, types, excludeInvalidated: true }).slice(0, limit)
+          globalScopesAvailable = getAvailableGlobalScopes(globalDb)
+        }
+
+        const result = {
+          memories,
+          global: globalMemories,
+          scopes_available: [...new Set([...scopes_available, ...globalScopesAvailable])],
+          total: memories.length + globalMemories.length,
+        }
+        return { content: [{ type: 'text', text: JSON.stringify(result) }] }
+      } catch (err) {
+        logger.error('browse_memories failed', err)
         throw err
       }
     },

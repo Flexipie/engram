@@ -32,7 +32,7 @@ const RecallSchema = z.object({
   scopes: z.array(scopeField()).optional(),
   types: z.array(z.enum(MEMORY_TYPES)).optional(),
   query: z.string().optional(),
-  include_global: z.boolean().optional().default(false),
+  include_global: z.boolean().optional().default(true),
   limit: z.number().int().min(1).max(50).optional(),
   worktree: z.string().optional(),
 })
